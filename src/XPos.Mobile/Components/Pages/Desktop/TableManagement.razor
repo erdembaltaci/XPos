@@ -1,0 +1,146 @@
+@page "/desktop/tables"
+@using System.Net.Http.Json
+@using System.Net 
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4">Masa Yönetimi</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddTable">Yeni Masa</MudButton>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@ErrorMessage</MudAlert>
+    }
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" Class="mx-auto" />
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var table in Tables)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard>
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">@table.TableNumber</MudText>
+                                <MudText Typo="Typo.body2">Kapasite: @table.Capacity Kişi</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteTable(table))" />
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                             <div class="d-flex justify-center my-2">
+                                 @{
+                                     var qrData = LinkGenerator(table.SecretToken);
+                                     var qrImgUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={Uri.EscapeDataString(qrData)}";
+                                 }
+                                 <MudImage Src="@qrImgUrl" Width="100" Height="100" Alt="QR Code" />
+                             </div>
+                             <MudText Typo="Typo.caption" Align="Align.Center" Class="d-block">Token: @table.SecretToken.ToString().Substring(0,8)...</MudText>
+                        </MudCardContent>
+                        <MudCardActions Class="d-flex justify-center">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Print" 
+                                       OnClick="@(() => PrintQr(table))" FullWidth="true">QR (@table.TableNumber)</MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private List<TableDto> Tables = new();
+    private bool isLoading = true;
+
+    // Change this to your actual deployed client URL in production
+    private string ClientBaseUrl = "http://localhost:5079"; 
+
+    private string ErrorMessage = null;
+    private string SuccessMessage = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        ErrorMessage = null;
+        try
+        {
+            var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            Tables = await Http.GetFromJsonAsync<List<TableDto>>("api/tables", options) ?? new();
+            
+            if (Tables.Count == 0) ErrorMessage = "Veri alındı ancak masa listesi boş. (API Erişim Başarılı)";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"API Bağlantı Hatası: {ex.Message}";
+            Snackbar.Add(ErrorMessage, Severity.Error);
+        }
+        isLoading = false;
+    }
+
+    private string LinkGenerator(Guid token) => $"{ClientBaseUrl}/?token={token}";
+
+    private async Task AddTable()
+    {
+        var parameters = new DialogParameters { ["Message"] = "Masa adını giriniz (Örn: Loca 1)" };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        
+        var dialog = await DialogService.ShowAsync<PromptDialog>("Yeni Masa", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is string tableName && !string.IsNullOrWhiteSpace(tableName))
+        {
+            var newTable = new TableDto
+            {
+                TableNumber = tableName,
+                Capacity = 4
+            };
+            
+            var res = await Http.PostAsJsonAsync("api/tables", newTable);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"{tableName} eklendi", Severity.Success);
+                await LoadData();
+            }
+        }
+    }
+
+    private async Task DeleteTable(TableDto t)
+    {
+        var confirm = await DialogService.ShowMessageBox("Sil", $"{t.TableNumber} silinsin mi?", yesText:"Evet", cancelText:"İptal");
+        if (confirm == true)
+        {
+            await Http.DeleteAsync($"api/tables/{t.Id}");
+            Tables.Remove(t);
+        }
+    }
+
+    private void PrintQr(TableDto t)
+    {
+        var qrData = LinkGenerator(t.SecretToken);
+        var qrImgUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(qrData)}";
+        
+        var parameters = new DialogParameters 
+        { 
+            ["Title"] = t.TableNumber,
+            ["QrUrl"] = qrImgUrl,
+            ["Link"] = qrData
+        };
+        DialogService.Show<QrPrintDialog>("QR Yazdır", parameters);
+    }
+}
+

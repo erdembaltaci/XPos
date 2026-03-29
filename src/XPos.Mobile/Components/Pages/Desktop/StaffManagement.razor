@@ -1,0 +1,116 @@
+@page "/desktop/staff"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Personel Yönetimi</MudText>
+
+    <MudTable Items="@Staffs" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading" LoadingProgressColor="Color.Info" Filter="new Func<StaffDto,bool>(FilterFunc)">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Personeller</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="searchString" Placeholder="Ara..." Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="OpenAddDialog" Class="ml-4">Yeni Personel</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Ad Soyad</MudTh>
+            <MudTh>Telefon</MudTh>
+            <MudTh>Rol</MudTh>
+            <MudTh>Şifre</MudTh>
+            <MudTh>İşlemler</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Ad Soyad">@context.Name @context.Surname</MudTd>
+            <MudTd DataLabel="Telefon">@context.Phone</MudTd>
+            <MudTd DataLabel="Rol">
+                <MudChip T="string" Color="@(context.Role == "Admin" ? Color.Error : Color.Success)" Size="Size.Small">@context.Role</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Şifre">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@context.StaffPassword</MudText>
+            </MudTd>
+            <MudTd DataLabel="İşlemler">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => OpenEditDialog(context))" Size="Size.Small" Class="mr-2" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteStaff(context))" Size="Size.Small" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<StaffDto> Staffs = new();
+    private string searchString = "";
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            Staffs = await Http.GetFromJsonAsync<List<StaffDto>>("api/staff") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Veri yüklenemedi: {ex.Message}", Severity.Error);
+        }
+        _loading = false;
+    }
+
+    private bool FilterFunc(StaffDto element)
+    {
+        if (string.IsNullOrWhiteSpace(searchString)) return true;
+        if ($"{element.Name} {element.Surname}".Contains(searchString, StringComparison.OrdinalIgnoreCase)) return true;
+        if (element.Phone.Contains(searchString)) return true;
+        return false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = DialogService.Show<AddStaffDialog>("Yeni Personel");
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task OpenEditDialog(StaffDto staff)
+    {
+        var parameters = new DialogParameters { ["Staff"] = staff };
+        var dialog = DialogService.Show<AddStaffDialog>("Personel Düzenle", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task DeleteStaff(StaffDto staff)
+    {
+        var confirm = await DialogService.ShowMessageBox("Sil", $"{staff.Name} {staff.Surname} personelini silmek istediğinize emin misiniz?", yesText: "Sil", cancelText: "İptal");
+        if (confirm == true)
+        {
+            var response = await Http.DeleteAsync($"api/staff/{staff.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Staffs.Remove(staff);
+                Snackbar.Add("Personel silindi", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Silme başarısız", Severity.Error);
+            }
+        }
+    }
+}

@@ -1,0 +1,254 @@
+@page "/"
+@using MudBlazor
+@using XPos.Shared.DTOs
+@using XPos.Shared.Enums
+@inject AuthStateService AuthService
+@inject NavigationManager Nav
+@inject HttpClient Http
+
+@if (!IsDesktop)
+{
+    <WaiterTables />
+}
+else
+{
+    <div class="dash-header">
+        <div>
+            <h2 class="dash-title">Dashboard</h2>
+            <span class="dash-subtitle">Hoş geldiniz, Yetkili</span>
+        </div>
+        <button class="dash-refresh" @onclick="LoadDashboardData">
+            <MudIcon Icon="@Icons.Material.Filled.Refresh" Style="font-size:18px; color:#64748B;" />
+            <span>Yenile</span>
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="dash-stats">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(82,196,26,0.1);">
+                <MudIcon Icon="@Icons.Material.Filled.TableRestaurant" Style="font-size:24px; color:#52C41A;" />
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Dolu Masalar</span>
+                <span class="stat-value">@occupiedTables / @totalTables</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(22,119,255,0.1);">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Style="font-size:24px; color:#1677FF;" />
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Günlük Ciro</span>
+                <span class="stat-value" style="color:#1677FF;">@dailyRevenue.ToString("N2") ₺</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:rgba(250,140,22,0.1);">
+                <MudIcon Icon="@Icons.Material.Filled.PendingActions" Style="font-size:24px; color:#FA8C16;" />
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Bekleyen Sipariş</span>
+                <span class="stat-value" style="color:#FA8C16;">@pendingOrders</span>
+            </div>
+        </div>
+        <div class="stat-card ai-card">
+            <div class="stat-icon" style="background:rgba(124,58,237,0.1);">
+                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Style="font-size:24px; color:#7C3AED;" />
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">AI Öneri</span>
+                <span class="stat-value" style="color:#7C3AED; font-size:13px;">@(aiCampaign ?? "Yükleniyor...")</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="dash-grid">
+        <!-- Son Siparişler -->
+        <div class="dash-card" style="flex:2;">
+            <div class="dash-card-header">
+                <h3>Son Siparişler</h3>
+                <a class="dash-link" @onclick='() => Nav.NavigateTo("/desktop/orders")'>Tümünü Gör →</a>
+            </div>
+            <div class="dash-table-wrap">
+                <table class="dash-table">
+                    <thead>
+                        <tr>
+                            <th>Sipariş</th>
+                            <th>Masa</th>
+                            <th>Ürün</th>
+                            <th>Tutar</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var o in recentOrders)
+                        {
+                            <tr>
+                                <td class="fw-600">#@o.Id</td>
+                                <td>@o.TableNumber</td>
+                                <td class="text-muted">@(o.Items?.Count ?? 0) ürün</td>
+                                <td class="fw-600">@o.TotalAmount.ToString("N2") ₺</td>
+                                <td>
+                                    <span class="status-chip @GetChipClass(o.Status)">@GetStatusText(o.Status)</span>
+                                </td>
+                            </tr>
+                        }
+                        @if (!recentOrders.Any())
+                        {
+                            <tr><td colspan="5" style="text-align:center; color:#94A3B8; padding:24px;">Henüz sipariş yok</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Hızlı Erişim -->
+        <div class="dash-card" style="flex:1;">
+            <div class="dash-card-header">
+                <h3>Hızlı Erişim</h3>
+            </div>
+            <div class="quick-links">
+                <a class="quick-link" @onclick='() => Nav.NavigateTo("/desktop/tables")'>
+                    <MudIcon Icon="@Icons.Material.Filled.TableRestaurant" Style="font-size:20px; color:#52C41A;" />
+                    <span>Masalar</span>
+                </a>
+                <a class="quick-link" @onclick='() => Nav.NavigateTo("/desktop/menu")'>
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Style="font-size:20px; color:#1677FF;" />
+                    <span>Menü Yönetimi</span>
+                </a>
+                <a class="quick-link" @onclick='() => Nav.NavigateTo("/desktop/reports")'>
+                    <MudIcon Icon="@Icons.Material.Filled.BarChart" Style="font-size:20px; color:#FA8C16;" />
+                    <span>Raporlar (Satış)</span>
+                </a>
+                <a class="quick-link" @onclick='() => Nav.NavigateTo("/ml/forecast")'>
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Style="font-size:20px; color:#7C3AED;" />
+                    <span>AI Tahmin</span>
+                </a>
+                <a class="quick-link" @onclick='() => Nav.NavigateTo("/ml/segments")'>
+                    <MudIcon Icon="@Icons.Material.Filled.Groups" Style="font-size:20px; color:#EC4899;" />
+                    <span>Segmentler</span>
+                </a>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+    .dash-title { margin: 0; font-size: 24px; font-weight: 700; color: #1E293B; }
+    .dash-subtitle { font-size: 14px; color: #94A3B8; }
+    .dash-refresh { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #64748B; padding: 8px 14px; border-radius: 8px; border: 1px solid #E2E8F0; background: white; cursor: pointer; }
+    .dash-refresh:hover { background: #F8FAFC; }
+
+    .dash-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 16px; transition: all 0.15s; }
+    .stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-1px); }
+    .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-info { display: flex; flex-direction: column; }
+    .stat-label { font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-size: 22px; font-weight: 700; color: #1E293B; }
+    .ai-card { border-left: 3px solid #7C3AED; }
+
+    .dash-grid { display: flex; flex-direction: column; gap: 20px; }
+    @@media (min-width: 960px) {
+        .dash-grid { flex-direction: row; }
+    }
+    .dash-card { background: white; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
+    .dash-card-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #F1F5F9; }
+    .dash-card-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: #1E293B; }
+    .dash-link { font-size: 13px; color: #1677FF; cursor: pointer; font-weight: 500; text-decoration: none; }
+    .dash-link:hover { text-decoration: underline; }
+
+    .dash-table-wrap { overflow-x: auto; }
+    .dash-table { width: 100%; border-collapse: collapse; }
+    .dash-table th { text-align: left; padding: 10px 20px; font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; background: #FAFBFC; }
+    .dash-table td { padding: 12px 20px; font-size: 14px; color: #334155; border-top: 1px solid #F1F5F9; }
+    .dash-table tr:hover td { background: #FAFBFC; }
+    .fw-600 { font-weight: 600; }
+    .text-muted { color: #94A3B8; }
+
+    .status-chip { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; }
+    .chip-active { background: #F0FFF4; color: #52C41A; }
+    .chip-pending { background: #FFF7E6; color: #FA8C16; }
+    .chip-completed { background: #EFF6FF; color: #1677FF; }
+    .chip-cancelled { background: #FFF1F0; color: #FF4D4F; }
+
+    .quick-links { display: flex; flex-direction: column; padding: 8px; }
+    .quick-link { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 8px; cursor: pointer; color: #334155; font-size: 14px; font-weight: 500; text-decoration: none; transition: all 0.15s; }
+    .quick-link:hover { background: #F8FAFC; }
+</style>
+
+@code {
+    private bool IsDesktop =>
+         DeviceInfo.Current.Platform == DevicePlatform.WinUI ||
+         DeviceInfo.Current.Platform == DevicePlatform.macOS;
+
+    private int totalTables, occupiedTables, pendingOrders;
+    private decimal dailyRevenue;
+    private string? aiCampaign;
+    private List<OrderDto> recentOrders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsDesktop)
+        {
+            await LoadDashboardData();
+        }
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            var tables = await Http.GetFromJsonAsync<List<TableDto>>("api/tables") ?? new();
+            var orders = await Http.GetFromJsonAsync<List<OrderDto>>("api/orders") ?? new();
+
+            totalTables = tables.Count;
+            occupiedTables = tables.Count(t => t.IsOccupied);
+            pendingOrders = orders.Count(o => o.Status == OrderStatus.Pending || o.Status == OrderStatus.AwaitingApproval);
+            dailyRevenue = orders.Where(o => o.CreatedAt.Date == DateTime.Today && o.Status == OrderStatus.Paid).Sum(o => o.TotalAmount);
+            recentOrders = orders.OrderByDescending(o => o.CreatedAt).Take(5).ToList();
+        }
+        catch { }
+
+        // AI kampanya
+        try
+        {
+            var activeResult = await Http.GetFromJsonAsync<ActiveCampaignResponse>("api/ml/campaigns/active");
+            if (activeResult?.Active == true && activeResult.Campaign != null)
+            {
+                aiCampaign = $"✅ {activeResult.Campaign.Title}";
+            }
+            else
+            {
+                aiCampaign = "Aktif kampanya yok";
+            }
+        }
+        catch { aiCampaign = "ML servis bağlantısı yok"; }
+    }
+
+    private string GetChipClass(OrderStatus s) => s switch
+    {
+        OrderStatus.Pending or OrderStatus.AwaitingApproval => "chip-pending",
+        OrderStatus.Confirmed or OrderStatus.Preparing or OrderStatus.Ready => "chip-active",
+        OrderStatus.Paid => "chip-completed",
+        OrderStatus.Cancelled => "chip-cancelled",
+        _ => ""
+    };
+
+    private string GetStatusText(OrderStatus s) => s switch
+    {
+        OrderStatus.Pending => "Bekliyor",
+        OrderStatus.AwaitingApproval => "Onay Bek.",
+        OrderStatus.Confirmed => "Onaylandı",
+        OrderStatus.Preparing => "Hazırlanıyor",
+        OrderStatus.Ready => "Hazır",
+        OrderStatus.Paid => "Tamamlandı",
+        OrderStatus.Cancelled => "İptal",
+        _ => "—"
+    };
+
+    private record ActiveCampaignResponse(bool Active, CampaignItem? Campaign);
+    private record CampaignItem(string Id, string Title, string Description, int DiscountPercent, List<string> TargetCategories, string Condition, int Priority, string Color);
+}

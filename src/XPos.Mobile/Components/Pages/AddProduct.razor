@@ -1,0 +1,437 @@
+@page "/table/{TableId:int}/add"
+@using System.Linq
+@using System.Collections.Generic
+@using XPos.Shared.DTOs
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AuthStateService Auth
+
+<!-- Header -->
+<div class="add-header">
+    <button class="back-btn" @onclick="GoBack">
+        <MudIcon Icon="@Icons.Material.Filled.ArrowBackIosNew" Style="font-size:18px; color:white;" />
+    </button>
+    <div class="header-info">
+        <h2 class="header-title">Ürün Ekle</h2>
+        <span class="header-sub">@(table?.TableNumber ?? "")</span>
+    </div>
+    @if (cart.Count > 0)
+    {
+        <div class="cart-badge">@cart.Count</div>
+    }
+</div>
+
+<!-- Search -->
+<div class="search-box">
+    <MudIcon Icon="@Icons.Material.Filled.Search" Style="font-size:18px; color:rgba(255,255,255,0.3);" />
+    <input type="text" class="search-input" placeholder="Ürün ara..." @bind="searchQuery" @bind:event="oninput" />
+    @if (!string.IsNullOrEmpty(searchQuery))
+    {
+        <button class="clear-search" @onclick="() => searchQuery = string.Empty">
+            <MudIcon Icon="@Icons.Material.Filled.Close" Style="font-size:16px; color:rgba(255,255,255,0.4);" />
+        </button>
+    }
+</div>
+
+<!-- Categories -->
+<div class="category-scroll">
+    <button class="cat-chip @(selectedCategoryId == null ? "active" : "")" @onclick="() => selectedCategoryId = null">Tümü</button>
+    @foreach (var cat in categories)
+    {
+        <button class="cat-chip @(selectedCategoryId == cat.Id ? "active" : "")" @onclick="() => selectedCategoryId = cat.Id">@cat.Name</button>
+    }
+</div>
+
+<!-- AI Recommendations & Campaigns -->
+@if (activeCampaign != null || aiRecommendations.Any() || isLoadingReco)
+{
+    <div class="ai-section">
+        <div class="ai-header">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Style="font-size:16px; color:#F59E0B;" />
+            <span class="ai-title">Yapay Zeka Asistanı</span>
+            @if (isLoadingReco)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Style="color:#F59E0B; width:12px; height:12px; margin-left:8px;" />
+            }
+        </div>
+
+        @if (activeCampaign != null)
+        {
+            <div class="ai-campaign-card">
+                <div class="camp-info">
+                    <span class="camp-title">🎯 @activeCampaign.Title</span>
+                    <span class="camp-desc">@activeCampaign.Description</span>
+                </div>
+                <button class="camp-apply-btn" @onclick="ApplyCampaign">Uygula</button>
+            </div>
+        }
+
+        @if (aiRecommendations.Any())
+        {
+            <div class="ai-reco-scroll">
+                @foreach (var reco in aiRecommendations)
+                {
+                    <div class="ai-reco-item" @onclick="() => AddRecoToCart(reco)">
+                        <div class="reco-icon">✨</div>
+                        <div class="reco-details">
+                            <span class="reco-name">@reco.Name</span>
+                            <span class="reco-conf">%@((int)(reco.Confidence * 100)) uyum</span>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.AddCircle" Style="font-size:20px; color:#818CF8;" />
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+<!-- Products -->
+<div class="products-area">
+    @if (isLoading)
+    {
+        <div class="loading-box">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" Style="color:#818CF8;" />
+        </div>
+    }
+    else
+    {
+        <div class="products-grid">
+            @foreach (var product in FilteredProducts)
+            {
+                var inCart = cart.FirstOrDefault(c => c.ProductId == product.Id);
+                <div class="product-card @(inCart != null ? "in-cart" : "")" @onclick="() => AddToCart(product)">
+                    <div class="prod-name">@product.Name</div>
+                    <div class="prod-price">@product.Price.ToString("N2") ₺</div>
+                    @if (inCart != null)
+                    {
+                        <div class="qty-control" @onclick:stopPropagation="true">
+                            <button class="qty-btn" @onclick="() => ChangeQty(inCart, -1)">−</button>
+                            <span class="qty-val">@inCart.Quantity</span>
+                            <button class="qty-btn plus" @onclick="() => ChangeQty(inCart, 1)">+</button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Cart Footer -->
+@if (cart.Count > 0)
+{
+    <div class="cart-footer">
+        <!-- Note -->
+        @if (showNote)
+        {
+            <div class="note-input-row">
+                <input type="text" class="note-input" placeholder="Sipariş notu..." @bind="currentNote" />
+            </div>
+        }
+        <div class="cart-row">
+            <button class="note-toggle" @onclick="() => showNote = !showNote">
+                <MudIcon Icon="@(showNote ? Icons.Material.Filled.StickyNote2 : Icons.Material.Outlined.StickyNote2)" Style="font-size:20px; color:#818CF8;" />
+            </button>
+            <div class="cart-info">
+                <span class="cart-count">@cart.Sum(c => c.Quantity) ürün</span>
+                <span class="cart-total">@GetCartTotal().ToString("N2") ₺</span>
+            </div>
+            <button class="send-btn" @onclick="SendOrder" disabled="@isSending">
+                @if (isSending) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="color:white;" /> }
+                else
+                {
+                    <span>Gönder</span>
+                    <MudIcon Icon="@Icons.Material.Filled.Send" Style="font-size:16px; color:white;" />
+                }
+            </button>
+        </div>
+    </div>
+}
+
+<style>
+    .add-header {
+        display: flex; align-items: center; gap: 12px; padding: 16px;
+        background: #1E293B; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .back-btn {
+        width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.05); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .back-btn:active { background: rgba(255,255,255,0.1); transform: scale(0.95); }
+    .header-info { flex: 1; }
+    .header-title { margin: 0; font-size: 18px; font-weight: 700; color: white; }
+    .header-sub { font-size: 12px; color: #818CF8; }
+    .cart-badge {
+        width: 28px; height: 28px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, #6366F1, #8B5CF6); color: white; font-size: 13px; font-weight: 800;
+    }
+
+    .search-box {
+        display: flex; align-items: center; gap: 8px; margin: 12px 16px 0; padding: 10px 14px;
+        background: #1E293B; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+    }
+    .search-input {
+        flex: 1; background: none; border: none; outline: none; color: white; font-size: 14px;
+    }
+    .search-input::placeholder { color: rgba(255,255,255,0.3); }
+    .clear-search { background: none; border: none; cursor: pointer; padding: 0; display: flex; }
+
+    .category-scroll {
+        display: flex; gap: 6px; padding: 12px 16px; overflow-x: auto;
+        -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .category-scroll::-webkit-scrollbar { display: none; }
+    .cat-chip {
+        white-space: nowrap; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5);
+        cursor: pointer; transition: all 0.2s;
+    }
+    .cat-chip.active {
+        background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.4); color: #818CF8;
+    }
+
+    .products-area { flex: 1; overflow-y: auto; padding: 0 16px 120px; }
+    .loading-box { display: flex; justify-content: center; padding: 48px; }
+
+    .products-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+    .product-card {
+        background: #1E293B; border: 1px solid rgba(255,255,255,0.04); border-radius: 14px;
+        padding: 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .product-card:active { transform: scale(0.97); }
+    .product-card.in-cart {
+        border-color: rgba(99,102,241,0.4);
+        background: linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.05) 100%);
+    }
+    .prod-name { font-size: 13px; font-weight: 600; color: white; margin-bottom: 4px; }
+    .prod-price { font-size: 14px; font-weight: 800; color: #818CF8; }
+
+    .qty-control {
+        display: flex; align-items: center; gap: 0; margin-top: 10px;
+        background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden;
+    }
+    .qty-btn {
+        width: 36px; height: 32px; border: none; background: none; color: white; font-size: 16px;
+        font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .qty-btn:active { background: rgba(255,255,255,0.1); }
+    .qty-btn.plus { color: #818CF8; }
+    .qty-val { flex: 1; text-align: center; font-size: 14px; font-weight: 800; color: white; }
+
+    .cart-footer {
+        position: fixed; bottom: 50px; left: 0; right: 0; padding: 12px 16px;
+        background: #1E293B; border-top: 1px solid rgba(255,255,255,0.06);
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    .note-input-row { margin-bottom: 8px; }
+    .note-input {
+        width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 10px; color: white; font-size: 13px; outline: none; box-sizing: border-box;
+    }
+    .note-input::placeholder { color: rgba(255,255,255,0.3); }
+
+    .cart-row { display: flex; align-items: center; gap: 10px; }
+    .note-toggle { background: none; border: none; cursor: pointer; padding: 6px; display: flex; }
+    .cart-info { flex: 1; }
+    .cart-count { display: block; font-size: 11px; color: rgba(255,255,255,0.4); }
+    .cart-total { font-size: 16px; font-weight: 800; color: white; }
+
+    .send-btn {
+        display: flex; align-items: center; gap: 6px; padding: 12px 24px; border-radius: 12px;
+        border: none; cursor: pointer; font-size: 14px; font-weight: 700;
+        background: linear-gradient(135deg, #6366F1, #8B5CF6); color: white;
+        box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+    }
+    .send-btn:active { transform: scale(0.97); }
+    .send-btn:disabled { opacity: 0.5; }
+
+    /* AI Section Styles */
+    .ai-section { margin: 8px 16px; background: #1E293B; border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 14px; padding: 12px; }
+    .ai-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .ai-title { font-size: 11px; font-weight: 800; color: #F59E0B; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .ai-campaign-card { 
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 10px;
+        display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px;
+    }
+    .camp-info { flex: 1; display: flex; flex-direction: column; }
+    .camp-title { font-size: 13px; font-weight: 700; color: #F59E0B; }
+    .camp-desc { font-size: 11px; color: rgba(255,255,255,0.6); }
+    .camp-apply-btn { 
+        background: #F59E0B; color: white; border: none; border-radius: 8px; padding: 6px 12px;
+        font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+
+    .ai-reco-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .ai-reco-scroll::-webkit-scrollbar { display: none; }
+    .ai-reco-item { 
+        flex: 0 0 140px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 10px; padding: 8px; display: flex; align-items: center; gap: 8px;
+    }
+    .reco-icon { font-size: 16px; }
+    .reco-details { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .reco-name { font-size: 12px; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .reco-conf { font-size: 9px; color: #818CF8; font-weight: 700; }
+</style>
+
+@code {
+    [Parameter] public int TableId { get; set; }
+
+    private List<ProductDto> allProducts = new();
+    private List<CategoryDto> categories = new();
+    private List<CartItem> cart = new();
+    private bool isLoading = true;
+    private bool isSending = false;
+    private string searchQuery = "";
+    private int? selectedCategoryId;
+    private bool showNote = false;
+    private string currentNote = "";
+    private TableDto? table;
+
+    // AI & Campaigns
+    private List<MobileRecoItem> aiRecommendations = new();
+    private bool isLoadingReco = false;
+    private MobileCampaignInfo? activeCampaign;
+
+    private record MobileRecoItem(int ProductId, string Name, decimal Price, double Confidence);
+    private record MobileCampaignInfo(string Id, string Title, string Description, decimal DiscountPercent, List<string> TargetCategories);
+    private record MobileActiveCampaignResponse(bool Active, MobileCampaignInfo? Campaign);
+    private record MobileSmartRecoResponse(List<MobileSmartRecoItem> Recommendations, int Count);
+    private record MobileSmartRecoItem(int ProductId, string Name, double Price, int CategoryId, double Confidence, string Reason);
+
+    private IEnumerable<ProductDto> FilteredProducts =>
+        allProducts.Where(p => p.IsActive)
+                   .Where(p => selectedCategoryId == null || p.CategoryId == selectedCategoryId)
+                   .Where(p => string.IsNullOrEmpty(searchQuery) || p.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var t1 = Http.GetFromJsonAsync<List<ProductDto>>("api/products");
+            var t2 = Http.GetFromJsonAsync<List<CategoryDto>>("api/categories");
+            var t3 = Http.GetFromJsonAsync<TableDto>($"api/tables/{TableId}");
+            await Task.WhenAll(t1, t2, t3);
+            allProducts = await t1 ?? new();
+            categories = await t2 ?? new();
+            table = await t3;
+
+            // Initial AI Load
+            await LoadActiveCampaign();
+            await FetchRecommendations();
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private async Task LoadActiveCampaign()
+    {
+        try
+        {
+            var campResp = await Http.GetFromJsonAsync<MobileActiveCampaignResponse>("api/ml/campaigns/active");
+            activeCampaign = campResp is { Active: true, Campaign: not null } ? campResp.Campaign : null;
+        }
+        catch { activeCampaign = null; }
+    }
+
+    private async Task FetchRecommendations()
+    {
+        if (cart.Count == 0) { aiRecommendations = new(); StateHasChanged(); return; }
+        if (isLoadingReco) return;
+        
+        isLoadingReco = true;
+        StateHasChanged();
+
+        try
+        {
+            var productNames = cart.Select(c => c.ProductName).ToList();
+            var payload = new { Products = productNames, Limit = 6 };
+            var response = await Http.PostAsJsonAsync("api/ml/recommendations/basket", payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<MobileSmartRecoResponse>();
+                if (result?.Recommendations != null)
+                {
+                    var cartIds = cart.Select(c => c.ProductId).ToHashSet();
+                    aiRecommendations = result.Recommendations
+                        .Where(r => !cartIds.Contains(r.ProductId))
+                        .Select(r => new MobileRecoItem(r.ProductId, r.Name, (decimal)r.Price, r.Confidence))
+                        .ToList();
+                }
+            }
+        }
+        catch { }
+        finally { isLoadingReco = false; StateHasChanged(); }
+    }
+
+    private void AddToCart(ProductDto p)
+    {
+        if (cart.All(c => c.ProductId != p.Id))
+        {
+            cart.Add(new CartItem { ProductId = p.Id, ProductName = p.Name, UnitPrice = p.Price, Quantity = 1 });
+            _ = FetchRecommendations(); // Fire and forget AI refresh
+        }
+    }
+
+    private void AddRecoToCart(MobileRecoItem reco)
+    {
+        var product = allProducts.FirstOrDefault(p => p.Id == reco.ProductId);
+        if (product != null) AddToCart(product);
+        aiRecommendations = aiRecommendations.Where(r => r.ProductId != reco.ProductId).ToList();
+    }
+
+    private void ApplyCampaign()
+    {
+        if (activeCampaign != null)
+        {
+            currentNote = $"[Kampanya: {activeCampaign.Title}] {currentNote}".Trim();
+            showNote = true;
+        }
+    }
+
+    private void ChangeQty(CartItem item, int d)
+    {
+        item.Quantity += d;
+        if (item.Quantity <= 0) 
+        {
+            cart.Remove(item);
+            _ = FetchRecommendations();
+        }
+    }
+
+    private decimal GetCartTotal() => cart.Sum(c => c.Quantity * c.UnitPrice);
+
+    private async Task SendOrder()
+    {
+        if (cart.Count == 0 || table == null) return;
+        isSending = true;
+        try
+        {
+            var dto = new CreateOrderDto
+            {
+                TableNumber = table.TableNumber,
+                Items = cart.Select(c => new CreateOrderItemDto
+                {
+                    ProductId = c.ProductId, Quantity = c.Quantity, UnitPrice = c.UnitPrice,
+                    Note = string.IsNullOrWhiteSpace(currentNote) ? null : currentNote
+                }).ToList()
+            };
+            var res = await Http.PostAsJsonAsync("api/orders", dto);
+            if (res.IsSuccessStatusCode) Nav.NavigateTo($"/table/{TableId}");
+        }
+        catch { }
+        finally { isSending = false; }
+    }
+
+    private void GoBack() => Nav.NavigateTo($"/table/{TableId}");
+
+    private class CartItem
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = "";
+        public decimal UnitPrice { get; set; }
+        public int Quantity { get; set; }
+    }
+}

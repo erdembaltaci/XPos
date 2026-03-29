@@ -1,0 +1,307 @@
+@page "/d/tables"
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div class="dt-header">
+    <h2 class="dt-title">Masalar</h2>
+    <button class="dt-refresh" @onclick="LoadData">
+        <MudIcon Icon="@Icons.Material.Filled.Refresh" Style="font-size:18px; color:#64748B;" />
+        <span>Yenile</span>
+    </button>
+</div>
+
+<!-- Table Grid -->
+<div class="dt-grid">
+    @if (isLoading)
+    {
+        <div style="grid-column:1/-1; text-align:center; padding:48px;">
+            <MudProgressCircular Indeterminate="true" Size="Size.Medium" Color="Color.Primary" />
+        </div>
+    }
+    else
+    {
+        @foreach (var t in tables)
+        {
+            <div class="dt-card @GetCardClass(t)" @onclick="() => SelectTable(t)">
+                <div class="dt-card-top">
+                    <span class="dt-table-name">@t.TableNumber</span>
+                    <span class="dt-status-dot @GetDotClass(t)"></span>
+                </div>
+                <div class="dt-cap">@t.Capacity kişilik</div>
+                @if (t.HasPendingOrder)
+                {
+                    <div class="dt-badge pending">ONAY BEKLİYOR</div>
+                }
+                else if (t.IsOccupied && t.CurrentOrderAmount.HasValue)
+                {
+                    <div class="dt-amount">@t.CurrentOrderAmount.Value.ToString("N0") TL</div>
+                }
+                else
+                {
+                    <div class="dt-empty-label">Boş</div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<!-- Selected Table Detail Panel -->
+@if (selectedTable != null)
+{
+    <div class="dt-detail-panel">
+        <div class="dt-detail-header">
+            <h3>@selectedTable.TableNumber</h3>
+            <button class="dt-close-btn" @onclick="() => selectedTable = null">
+                <MudIcon Icon="@Icons.Material.Filled.Close" Style="font-size:18px; color:#64748B;" />
+            </button>
+        </div>
+
+        @if (selectedOrder != null)
+        {
+            <div class="dt-detail-status">
+                <span class="status-chip @GetChipClass(selectedOrder.Status)">@GetStatusText(selectedOrder.Status)</span>
+                <span class="dt-detail-time">@selectedOrder.CreatedAt.ToString("HH:mm")</span>
+            </div>
+
+            <!-- Items -->
+            <div class="dt-items-section">
+                <div class="dt-items-title">Sipariş Ürünleri (@(selectedOrder.Items?.Count ?? 0))</div>
+                @if (selectedOrder.Items != null && selectedOrder.Items.Any())
+                {
+                    @foreach (var item in selectedOrder.Items)
+                    {
+                        <div class="dt-item-row">
+                            <span class="dt-item-qty">@item.Quantity×</span>
+                            <span class="dt-item-name">@(string.IsNullOrEmpty(item.ProductName) ? GetProductName(item.ProductId) : item.ProductName)</span>
+                            <span class="dt-item-price">@((item.Quantity * item.UnitPrice).ToString("N2")) TL</span>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="dt-empty-item">Henüz ürün eklenmemiş</div>
+                }
+            </div>
+
+            <div class="dt-total-row">
+                <span>Toplam</span>
+                <span class="dt-total-val">@selectedOrder.TotalAmount.ToString("N2") TL</span>
+            </div>
+
+            <!-- Actions -->
+            <div class="dt-actions">
+                @if (selectedOrder.Status == OrderStatus.Pending)
+                {
+                    <button class="dt-btn reject" @onclick="RejectOrder">Reddet</button>
+                    <button class="dt-btn approve" @onclick="ApproveOrder">Onayla</button>
+                }
+                @if (selectedOrder.Status == OrderStatus.Confirmed || selectedOrder.Status == OrderStatus.Preparing || selectedOrder.Status == OrderStatus.Ready)
+                {
+                    <button class="dt-btn pay" @onclick="() => showPayment = true">
+                        <MudIcon Icon="@Icons.Material.Filled.CreditCard" Style="font-size:18px;" /> Ödeme Al
+                    </button>
+                }
+            </div>
+
+            <!-- Payment Section -->
+            @if (showPayment)
+            {
+                <PaymentDialog Order="selectedOrder" 
+                               OnClose="() => showPayment = false" 
+                               OnPaymentCompleted="OnPaymentCompleted" />
+            }
+        }
+        else
+        {
+            <div class="dt-empty-detail">
+                <MudIcon Icon="@Icons.Material.Outlined.TableRestaurant" Style="font-size:40px; color:#CBD5E1;" />
+                <p>Bu masada aktif sipariş yok</p>
+            </div>
+        }
+    </div>
+}
+
+<style>
+    .dt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .dt-title { margin: 0; font-size: 20px; font-weight: 600; color: #1E293B; }
+    .dt-refresh { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #64748B; padding: 8px 14px; border-radius: 8px; border: 1px solid #E2E8F0; background: white; cursor: pointer; }
+    .dt-refresh:hover { background: #F8FAFC; }
+
+    .dt-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 24px; }
+    .dt-card { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.15s; }
+    .dt-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-1px); }
+    .dt-card.selected { border-color: #1677FF; box-shadow: 0 0 0 2px rgba(22,119,255,0.15); }
+    .dt-card.dt-occupied { border-left: 3px solid #52C41A; }
+    .dt-card.dt-pending { border-left: 3px solid #FA8C16; }
+
+    .dt-card-top { display: flex; justify-content: space-between; align-items: center; }
+    .dt-table-name { font-size: 15px; font-weight: 600; color: #1E293B; }
+    .dt-status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-empty { background: #CBD5E1; }
+    .dot-occupied { background: #52C41A; }
+    .dot-pending { background: #FA8C16; animation: pulse-dot 1.5s infinite; }
+    @@keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .dt-cap { font-size: 12px; color: #94A3B8; margin-top: 4px; }
+    .dt-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-top: 8px; display: inline-block; }
+    .dt-badge.pending { background: #FFF7E6; color: #FA8C16; }
+    .dt-amount { font-size: 16px; font-weight: 700; color: #52C41A; margin-top: 8px; }
+    .dt-empty-label { font-size: 12px; color: #CBD5E1; margin-top: 8px; }
+
+    .dt-detail-panel { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; }
+    .dt-detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .dt-detail-header h3 { margin: 0; font-size: 18px; font-weight: 600; color: #1E293B; }
+    .dt-close-btn { width: 32px; height: 32px; border-radius: 6px; border: 1px solid #E2E8F0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    .dt-detail-status { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .status-chip { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; }
+    .chip-active { background: #F0FFF4; color: #52C41A; }
+    .chip-pending { background: #FFF7E6; color: #FA8C16; }
+    .chip-completed { background: #EFF6FF; color: #1677FF; }
+    .chip-cancelled { background: #FFF1F0; color: #FF4D4F; }
+    .dt-detail-time { font-size: 13px; color: #94A3B8; }
+
+    .dt-items-section { margin-bottom: 16px; }
+    .dt-items-title { font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .dt-item-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #F1F5F9; font-size: 14px; }
+    .dt-item-qty { width: 32px; color: #1677FF; font-weight: 600; }
+    .dt-item-name { flex: 1; color: #334155; }
+    .dt-item-price { color: #1E293B; font-weight: 600; }
+
+    .dt-total-row { display: flex; justify-content: space-between; padding: 12px 0; border-top: 2px solid #E2E8F0; margin-bottom: 16px; font-size: 15px; }
+    .dt-total-row span:first-child { color: #64748B; font-weight: 500; }
+    .dt-total-val { font-size: 20px; font-weight: 700; color: #1E293B; }
+
+    .dt-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+    .dt-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .dt-btn:hover { opacity: 0.9; }
+    .dt-btn.reject { background: #FFF1F0; color: #FF4D4F; }
+    .dt-btn.approve { background: #F0FFF4; color: #52C41A; }
+    .dt-btn.pay { background: #1677FF; color: white; }
+
+    .dt-payment { background: #F8FAFC; border-radius: 8px; padding: 16px; border: 1px solid #E2E8F0; }
+    .dt-pay-header { font-size: 14px; font-weight: 600; color: #1E293B; margin-bottom: 10px; }
+    .dt-pay-info { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #64748B; margin-bottom: 12px; }
+    .dt-pay-remaining { font-weight: 600; color: #FF4D4F; }
+    .dt-pay-input { display: flex; gap: 8px; margin-bottom: 10px; }
+    .dt-input { flex: 1; padding: 8px 12px; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 14px; }
+    .dt-btn-sm { padding: 8px 14px; border-radius: 6px; border: 1px solid #E2E8F0; background: white; cursor: pointer; font-size: 13px; font-weight: 500; }
+    .dt-pay-btns { display: flex; gap: 8px; }
+    .dt-btn.cash { flex: 1; background: #52C41A; color: white; }
+    .dt-btn.card { flex: 1; background: #1677FF; color: white; }
+    .dt-pay-msg { margin-top: 8px; font-size: 13px; color: #52C41A; font-weight: 500; }
+
+    .dt-empty-detail { text-align: center; padding: 32px; color: #94A3B8; }
+    .dt-empty-detail p { margin-top: 8px; }
+</style>
+
+@code {
+    private List<TableDto> tables = new();
+    private List<ProductDto> products = new();
+    private bool isLoading = true;
+    private TableDto? selectedTable;
+    private OrderDto? selectedOrder;
+    private bool showPayment;
+    private decimal paymentAmount;
+    private string? payMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            tables = await Http.GetFromJsonAsync<List<TableDto>>("api/tables") ?? new();
+            products = await Http.GetFromJsonAsync<List<ProductDto>>("api/products") ?? new();
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private async Task SelectTable(TableDto t)
+    {
+        selectedTable = t;
+        selectedOrder = null;
+        showPayment = false;
+        payMessage = null;
+
+        try
+        {
+            var response = await Http.GetAsync($"api/orders/active/{t.TableNumber}");
+            if (response.IsSuccessStatusCode)
+            {
+                selectedOrder = await response.Content.ReadFromJsonAsync<OrderDto>();
+            }
+            else
+            {
+                selectedOrder = null;
+            }
+
+            if (selectedOrder != null)
+                paymentAmount = selectedOrder.TotalAmount - selectedOrder.PaidAmount;
+        }
+        catch { }
+    }
+
+    private string GetProductName(int id) => products.FirstOrDefault(p => p.Id == id)?.Name ?? $"Ürün #{id}";
+
+    private string GetCardClass(TableDto t)
+    {
+        var cls = "";
+        if (t.HasPendingOrder) cls = "dt-pending";
+        else if (t.IsOccupied) cls = "dt-occupied";
+        if (selectedTable?.Id == t.Id) cls += " selected";
+        return cls;
+    }
+
+    private string GetDotClass(TableDto t)
+    {
+        if (t.HasPendingOrder) return "dot-pending";
+        if (t.IsOccupied) return "dot-occupied";
+        return "dot-empty";
+    }
+
+    private string GetChipClass(OrderStatus s) => s switch
+    {
+        OrderStatus.Pending => "chip-pending",
+        OrderStatus.Confirmed or OrderStatus.Preparing or OrderStatus.Ready => "chip-active",
+        OrderStatus.Paid => "chip-completed",
+        OrderStatus.Cancelled => "chip-cancelled",
+        _ => ""
+    };
+
+    private string GetStatusText(OrderStatus s) => s switch
+    {
+        OrderStatus.Pending => "Onay Bekliyor",
+        OrderStatus.Confirmed => "Aktif",
+        OrderStatus.Preparing => "Hazırlanıyor",
+        OrderStatus.Ready => "Hazır",
+        OrderStatus.Paid => "Tamamlandı",
+        OrderStatus.Cancelled => "İptal",
+        _ => "—"
+    };
+
+    private async Task ApproveOrder()
+    {
+        if (selectedOrder == null) return;
+        await Http.PutAsJsonAsync($"api/orders/{selectedOrder.Id}/status", (int)OrderStatus.Confirmed);
+        await SelectTable(selectedTable!);
+        await LoadData();
+    }
+
+    private async Task RejectOrder()
+    {
+        if (selectedOrder == null) return;
+        await Http.PutAsJsonAsync($"api/orders/{selectedOrder.Id}/status", (int)OrderStatus.Cancelled);
+        selectedOrder = null;
+        await LoadData();
+    }
+
+    private async Task OnPaymentCompleted()
+    {
+        showPayment = false;
+        await SelectTable(selectedTable!); // Reload order details
+        await LoadData(); // Reload table list (status dots)
+    }
+}

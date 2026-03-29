@@ -1,0 +1,167 @@
+@page "/d/reports"
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<div class="d-flex justify-space-between align-center mb-6">
+    <MudText Typo="Typo.h4" Class="fw-bold">Raporlar & Analiz</MudText>
+    <div class="d-flex gap-4">
+        <MudDateRangePicker Label="Tarih Aralığı" @bind-DateRange="_dateRange" HelperText="Rapor aralığını seçiniz" Class="mud-width-full" Style="background:white;" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadData" StartIcon="@Icons.Material.Filled.Refresh">Yenile</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Success" OnClick="ExportData" StartIcon="@Icons.Material.Filled.FileDownload">Excel İndir</MudButton>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Indeterminate="true" Color="Color.Primary" Class="d-block mx-auto my-16" />
+}
+else
+{
+    <!-- Summary Cards -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="pa-4 d-flex flex-column align-center justify-center gap-2" Elevation="2">
+                <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">Toplam Ciro</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Success" Class="fw-bold">@_totalRevenue.ToString("N2") TL</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="pa-4 d-flex flex-column align-center justify-center gap-2" Elevation="2">
+                <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">Toplam Sipariş</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Info" Class="fw-bold">@_totalOrders</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="pa-4 d-flex flex-column align-center justify-center gap-2" Elevation="2">
+                <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">Ortalama Sepet</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Warning" Class="fw-bold">@(_totalOrders > 0 ? (_totalRevenue / _totalOrders).ToString("N2") : "0.00") TL</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid>
+        <!-- Daily Sales Chart -->
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">Günlük Satış Trendi</MudText>
+                <MudChart ChartType="ChartType.Line" ChartSeries="@_dailySalesSeries" XAxisLabels="@_dailySalesLabels" Width="100%" Height="350px" />
+            </MudPaper>
+        </MudItem>
+
+        <!-- Category Distribution -->
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">Kategori Dağılımı</MudText>
+                <MudChart ChartType="ChartType.Donut" InputData="@_categoryData" InputLabels="@_categoryLabels" Width="100%" Height="300px" />
+            </MudPaper>
+        </MudItem>
+
+        <!-- Top Products -->
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">En Çok Satan Ürünler</MudText>
+                <MudTable Items="@_topProducts" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Ürün Adı</MudTh>
+                        <MudTh>Adet</MudTh>
+                        <MudTh>Toplam Gelir</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Ürün Adı">@context.ProductName</MudTd>
+                        <MudTd DataLabel="Adet">@context.TotalQuantity</MudTd>
+                        <MudTd DataLabel="Toplam Gelir">@context.TotalRevenue.ToString("N2") TL</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DateRange _dateRange = new DateRange(DateTime.Today.AddDays(-6), DateTime.Today);
+    private bool _isLoading = false;
+
+    private decimal _totalRevenue = 0;
+    private int _totalOrders = 0;
+
+    private List<ChartSeries> _dailySalesSeries = new();
+    private string[] _dailySalesLabels = Array.Empty<string>();
+
+    private double[] _categoryData = Array.Empty<double>();
+    private string[] _categoryLabels = Array.Empty<string>();
+
+    private List<ProductSalesDto> _topProducts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var start = _dateRange.Start ?? DateTime.Today.AddDays(-6);
+            var end = _dateRange.End ?? DateTime.Today;
+
+            // 1. Daily Sales
+            var dailySales = await Http.GetFromJsonAsync<List<DailySalesDto>>($"api/reports/daily?startDate={start:yyyy-MM-dd}&endDate={end:yyyy-MM-dd}") ?? new();
+            
+            _totalRevenue = dailySales.Sum(d => d.TotalAmount);
+            _totalOrders = dailySales.Sum(d => d.OrderCount);
+
+            _dailySalesSeries = new List<ChartSeries>
+            {
+                new ChartSeries { Name = "Ciro (TL)", Data = dailySales.Select(d => (double)d.TotalAmount).ToArray() }
+            };
+            _dailySalesLabels = dailySales.Select(d => d.Date.ToString("dd.MM")).ToArray();
+
+            // 2. Categories
+            var categories = await Http.GetFromJsonAsync<List<CategorySalesDto>>($"api/reports/categories") ?? new();
+            _categoryData = categories.Select(c => (double)c.TotalRevenue).ToArray();
+            _categoryLabels = categories.Select(c => $"{c.CategoryName} (%{c.Percentage:F1})").ToArray();
+
+            // 3. Top Products
+            _topProducts = await Http.GetFromJsonAsync<List<ProductSalesDto>>($"api/reports/products?count=5") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ExportData()
+    {
+        // Simple CSV Export Logic
+        var csv = "Tarih,Ciro,Siparis Sayisi\n";
+        var start = _dateRange.Start ?? DateTime.Today.AddDays(-6);
+        var end = _dateRange.End ?? DateTime.Today;
+        
+        var dailySales = await Http.GetFromJsonAsync<List<DailySalesDto>>($"api/reports/daily?startDate={start:yyyy-MM-dd}&endDate={end:yyyy-MM-dd}") ?? new();
+
+        foreach (var day in dailySales)
+        {
+            csv += $"{day.Date:yyyy-MM-dd},{day.TotalAmount},{day.OrderCount}\n";
+        }
+
+        await JS.InvokeVoidAsync("downloadFile", "satis_raporu.csv", csv);
+    }
+}
+
+<script>
+    window.downloadFile = (filename, content) => {
+        const blob = new Blob([content], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+</script>

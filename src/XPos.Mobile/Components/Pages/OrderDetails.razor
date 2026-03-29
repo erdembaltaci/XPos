@@ -1,0 +1,235 @@
+@page "/order-details/{OrderId:int}"
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AuthStateService Auth
+
+<!-- Header -->
+<div class="detail-header">
+    <button class="back-btn" @onclick="GoBack">
+        <MudIcon Icon="@Icons.Material.Filled.ArrowBackIosNew" Style="font-size:18px; color:white;" />
+    </button>
+    <div class="header-info">
+        <h2 class="header-title">Sipariş #@OrderId</h2>
+        @if (order != null)
+        {
+            <span class="header-sub">@order.TableNumber • @order.CreatedAt.ToString("HH:mm")</span>
+        }
+    </div>
+    @if (order != null)
+    {
+        <span class="status-badge @GetStatusClass()">@GetStatusText()</span>
+    }
+</div>
+
+@if (isLoading)
+{
+    <div class="loading-box">
+        <MudProgressCircular Indeterminate="true" Size="Size.Large" Style="color:#818CF8;" />
+    </div>
+}
+else if (order != null)
+{
+    <!-- QR Onay -->
+    @if (order.Status == OrderStatus.Pending)
+    {
+        <div class="pending-alert">
+            <div class="pending-icon">
+                <MudIcon Icon="@Icons.Material.Filled.QrCode2" Style="font-size:24px; color:#FBBF24;" />
+            </div>
+            <div class="pending-info">
+                <div class="pending-title">QR Sipariş — Onay Bekliyor</div>
+                <div class="pending-sub">Müşteri menüden sipariş oluşturdu</div>
+            </div>
+        </div>
+        <div class="approval-btns">
+            <button class="approve-btn reject" @onclick="RejectOrder">
+                <MudIcon Icon="@Icons.Material.Filled.Close" Style="font-size:20px;" /> Reddet
+            </button>
+            <button class="approve-btn accept" @onclick="ApproveOrder">
+                <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:20px;" /> Onayla
+            </button>
+        </div>
+    }
+
+    <!-- Ürün Listesi -->
+    <div class="items-section">
+        <div class="section-title">
+            <span>Ürünler</span>
+            <span class="item-count">@order.Items.Count ürün</span>
+        </div>
+
+        @foreach (var item in order.Items)
+        {
+            <div class="order-item">
+                <div class="item-qty">@item.Quantity</div>
+                <div class="item-info">
+                    <div class="item-name">@GetProductName(item.ProductId)</div>
+                    @if (!string.IsNullOrEmpty(item.Note))
+                    {
+                        <div class="item-note">📝 @item.Note</div>
+                    }
+                    <div class="item-price-unit">@item.UnitPrice.ToString("N2") ₺ / adet</div>
+                </div>
+                <div class="item-total">@((item.Quantity * item.UnitPrice).ToString("N2")) ₺</div>
+            </div>
+        }
+    </div>
+
+    <!-- Total -->
+    <div class="total-card">
+        <div class="total-row">
+            <span>Toplam</span>
+            <span class="total-amount">@order.TotalAmount.ToString("N2") ₺</span>
+        </div>
+        <div class="total-meta">
+            <MudIcon Icon="@Icons.Material.Filled.AccessTime" Style="font-size:14px;" />
+            @order.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+        </div>
+    </div>
+}
+
+<style>
+    .detail-header {
+        display: flex; align-items: center; gap: 12px; padding: 16px;
+        background: #1E293B; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .back-btn {
+        width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.05); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .back-btn:active { background: rgba(255,255,255,0.1); transform: scale(0.95); }
+    .header-info { flex: 1; }
+    .header-title { margin: 0; font-size: 18px; font-weight: 700; color: white; }
+    .header-sub { font-size: 12px; color: rgba(255,255,255,0.4); }
+
+    .status-badge {
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+        padding: 4px 10px; border-radius: 8px;
+    }
+    .status-active { background: rgba(52,211,153,0.15); color: #34D399; }
+    .status-pending { background: rgba(251,191,36,0.15); color: #FBBF24; }
+    .status-completed { background: rgba(99,102,241,0.15); color: #818CF8; }
+    .status-cancelled { background: rgba(239,68,68,0.15); color: #F87171; }
+
+    .loading-box { display: flex; justify-content: center; padding: 64px; }
+
+    .pending-alert {
+        display: flex; align-items: center; gap: 12px; margin: 16px; padding: 14px;
+        background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2); border-radius: 16px;
+    }
+    .pending-icon {
+        width: 44px; height: 44px; border-radius: 12px; background: rgba(251,191,36,0.15);
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .pending-title { font-size: 14px; font-weight: 700; color: #FBBF24; }
+    .pending-sub { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    .approval-btns { display: flex; gap: 8px; margin: 0 16px 12px; }
+    .approve-btn {
+        flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+        padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 700; border: none; cursor: pointer;
+    }
+    .approve-btn:active { transform: scale(0.97); }
+    .approve-btn.reject { background: rgba(239,68,68,0.15); color: #F87171; }
+    .approve-btn.accept { background: linear-gradient(135deg, #34D399, #10B981); color: white; }
+
+    .items-section { padding: 0 16px; }
+    .section-title {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 12px 0 8px; font-size: 12px; color: rgba(255,255,255,0.4);
+        text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+    }
+    .item-count { color: #818CF8; }
+
+    .order-item {
+        display: flex; align-items: flex-start; gap: 12px; padding: 12px;
+        background: #1E293B; border-radius: 14px; margin-bottom: 8px;
+        border: 1px solid rgba(255,255,255,0.04);
+    }
+    .item-qty {
+        width: 32px; height: 32px; border-radius: 8px; background: rgba(129,140,248,0.15);
+        color: #818CF8; font-weight: 800; font-size: 14px;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-size: 14px; font-weight: 600; color: white; }
+    .item-note { font-size: 11px; color: #F87171; margin-top: 3px; }
+    .item-price-unit { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; }
+    .item-total { font-size: 14px; font-weight: 700; color: #34D399; white-space: nowrap; }
+
+    .total-card {
+        margin: 12px 16px 24px; padding: 16px; border-radius: 16px;
+        background: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.08) 100%);
+        border: 1px solid rgba(99,102,241,0.2);
+    }
+    .total-row { display: flex; justify-content: space-between; align-items: center; }
+    .total-row span:first-child { font-size: 14px; color: rgba(255,255,255,0.6); }
+    .total-amount { font-size: 22px; font-weight: 800; color: white; }
+    .total-meta {
+        display: flex; align-items: center; gap: 4px; margin-top: 8px;
+        font-size: 11px; color: rgba(255,255,255,0.3);
+    }
+</style>
+
+@code {
+    [Parameter] public int OrderId { get; set; }
+
+    private OrderDto? order;
+    private List<ProductDto>? products;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var t1 = Http.GetFromJsonAsync<OrderDto>($"api/orders/{OrderId}");
+            var t2 = Http.GetFromJsonAsync<List<ProductDto>>("api/products");
+            await Task.WhenAll(t1, t2);
+            order = await t1;
+            products = await t2;
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private string GetProductName(int id) => products?.FirstOrDefault(p => p.Id == id)?.Name ?? $"Ürün #{id}";
+
+    private string GetStatusClass() => order?.Status switch
+    {
+        OrderStatus.Pending => "status-pending",
+        OrderStatus.Confirmed or OrderStatus.Preparing or OrderStatus.Ready => "status-active",
+        OrderStatus.Paid => "status-completed",
+        OrderStatus.Cancelled => "status-cancelled",
+        _ => "status-completed"
+    };
+
+    private string GetStatusText() => order?.Status switch
+    {
+        OrderStatus.Pending => "Onay Bekliyor",
+        OrderStatus.Confirmed => "Aktif",
+        OrderStatus.Preparing => "Hazırlanıyor",
+        OrderStatus.Ready => "Hazır",
+        OrderStatus.Paid => "Tamamlandı",
+        OrderStatus.Cancelled => "İptal",
+        _ => "—"
+    };
+
+    private void GoBack() => Nav.NavigateTo("/orders");
+
+    private async Task ApproveOrder()
+    {
+        if (order == null) return;
+        await Http.PutAsJsonAsync($"api/orders/{order.Id}/status", (int)OrderStatus.Confirmed);
+        await LoadData();
+    }
+
+    private async Task RejectOrder()
+    {
+        if (order == null) return;
+        await Http.PutAsJsonAsync($"api/orders/{order.Id}/status", (int)OrderStatus.Cancelled);
+        await LoadData();
+    }
+}

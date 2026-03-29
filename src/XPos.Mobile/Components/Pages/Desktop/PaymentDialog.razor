@@ -1,0 +1,239 @@
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<div class="pay-overlay">
+    <div class="pay-modal">
+        <div class="pay-header">
+            <h3>Ödeme Al - Masa @Order.TableNumber</h3>
+            <button class="pay-close" @onclick="OnClose">
+                <MudIcon Icon="@Icons.Material.Filled.Close" />
+            </button>
+        </div>
+
+        <div class="pay-summary">
+            <div class="pay-sum-item">
+                <span class="label">Toplam Tutar</span>
+                <span class="value">@Order.TotalAmount.ToString("N2") TL</span>
+            </div>
+            <div class="pay-sum-item">
+                <span class="label">Ödenen</span>
+                <span class="value success">@Order.PaidAmount.ToString("N2") TL</span>
+            </div>
+            <div class="pay-sum-item">
+                <span class="label">Kalan</span>
+                <span class="value remaining">@RemainingAmount.ToString("N2") TL</span>
+            </div>
+        </div>
+
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pay-tab-panel">
+            <!-- TAB 1: TAM ÖDEME -->
+            <MudTabPanel Text="Tam Ödeme">
+                <div class="pay-tab-content">
+                    <p class="pay-desc">Masanın kalan tüm borcunu öde ve kapat.</p>
+                    <div class="pay-amount-display">
+                        @RemainingAmount.ToString("N2") TL
+                    </div>
+                    <div class="pay-actions">
+                        <button class="pay-btn cash" @onclick='() => ProcessPayment(RemainingAmount, "Nakit")'>
+                            <MudIcon Icon="@Icons.Material.Filled.Money" /> Nakit
+                        </button>
+                        <button class="pay-btn card" @onclick='() => ProcessPayment(RemainingAmount, "Kart")'>
+                            <MudIcon Icon="@Icons.Material.Filled.CreditCard" /> Kredi Kartı
+                        </button>
+                    </div>
+                </div>
+            </MudTabPanel>
+
+            <!-- TAB 2: PARÇALI ÖDEME -->
+            <MudTabPanel Text="Tutar Gir">
+                <div class="pay-tab-content">
+                    <p class="pay-desc">Müşterinin ödemek istediği tutarı girin.</p>
+                    <div class="pay-input-group">
+                        <MudNumericField @bind-Value="partialAmount" Label="Ödenecek Tutar" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentText="TL" />
+                    </div>
+                    <div class="pay-actions">
+                        <button class="pay-btn cash" @onclick='() => ProcessPayment(partialAmount, "Nakit")'>
+                            <MudIcon Icon="@Icons.Material.Filled.Money" /> Nakit
+                        </button>
+                        <button class="pay-btn card" @onclick='() => ProcessPayment(partialAmount, "Kart")'>
+                            <MudIcon Icon="@Icons.Material.Filled.CreditCard" /> Kart
+                        </button>
+                    </div>
+                </div>
+            </MudTabPanel>
+
+            <!-- TAB 3: ÜRÜN BAZLI (ALMAN USULÜ) -->
+            <MudTabPanel Text="Ürün Seç">
+                <div class="pay-tab-content" style="padding:0;">
+                    <div class="pay-items-list">
+                        @foreach (var item in UnpaidItems)
+                        {
+                            <div class="pay-list-item @(selectedItemIds.Contains(item.Id) ? "selected" : "")" @onclick="() => ToggleItem(item)">
+                                <div class="pli-check">
+                                    @if(selectedItemIds.Contains(item.Id)) { <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" /> }
+                                    else { <MudIcon Icon="@Icons.Material.Outlined.RadioButtonUnchecked" Color="Color.Default" Size="Size.Small" /> }
+                                </div>
+                                <div class="pli-info">
+                                    <span class="pli-name">@item.ProductName</span>
+                                    <span class="pli-meta">@item.Quantity Adet</span>
+                                </div>
+                                <div class="pli-price">
+                                    @((item.Quantity * item.UnitPrice).ToString("N2")) TL
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="pay-items-footer">
+                        <div class="pif-total">
+                            <span>Seçilen Toplam:</span>
+                            <strong>@selectedTotal.ToString("N2") TL</strong>
+                        </div>
+                        <button class="pay-btn primary" disabled="@(selectedTotal == 0)" @onclick="ProcessItemPayment">
+                            Seçilenleri Öde
+                        </button>
+                    </div>
+                </div>
+            </MudTabPanel>
+        </MudTabs>
+    </div>
+</div>
+
+<style>
+    .pay-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
+    .pay-modal { width: 500px; background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; }
+    .pay-header { padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC; }
+    .pay-header h3 { margin: 0; font-size: 18px; font-weight: 600; color: #1E293B; }
+    .pay-close { background: none; border: none; cursor: pointer; color: #64748B; padding: 4px; border-radius: 4px; display: flex; }
+    .pay-close:hover { background: #E2E8F0; color: #EF4444; }
+
+    .pay-summary { display: flex; padding: 16px 20px; background: #F1F5F9; gap: 24px; border-bottom: 1px solid #E2E8F0; }
+    .pay-sum-item { display: flex; flex-direction: column; gap: 2px; }
+    .pay-sum-item .label { font-size: 12px; font-weight: 600; color: #64748B; text-transform: uppercase; }
+    .pay-sum-item .value { font-size: 16px; font-weight: 700; color: #1E293B; }
+    .pay-sum-item .value.success { color: #22C55E; }
+    .pay-sum-item .value.remaining { color: #EF4444; }
+
+    .pay-tab-panel { padding: 20px; min-height: 250px; }
+    .pay-tab-content { display: flex; flex-direction: column; height: 100%; gap: 16px; }
+    .pay-desc { color: #64748B; font-size: 14px; margin: 0; text-align: center; }
+    .pay-amount-display { font-size: 36px; font-weight: 700; color: #1E293B; text-align: center; margin: 10px 0; }
+    
+    .pay-actions { display: flex; gap: 10px; margin-top: auto; }
+    .pay-btn { flex: 1; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
+    .pay-btn:hover { transform: translateY(-1px); shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .pay-btn.cash { background: #22C55E; color: white; }
+    .pay-btn.card { background: #3B82F6; color: white; }
+    .pay-btn.primary { background: #1E293B; color: white; }
+    .pay-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .pay-input-group { padding: 0 20px; }
+    
+    .pay-items-list { max-height: 220px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 8px; }
+    .pay-list-item { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #F1F5F9; cursor: pointer; user-select: none; transition: background 0.1s; }
+    .pay-list-item:last-child { border-bottom: none; }
+    .pay-list-item:hover { background: #F8FAFC; }
+    .pay-list-item.selected { background: #EFF6FF; }
+    .pli-check { margin-right: 12px; display: flex; align-items: center; }
+    .pli-info { flex: 1; display: flex; flex-direction: column; }
+    .pli-name { font-size: 14px; font-weight: 500; color: #334155; }
+    .pli-meta { font-size: 12px; color: #94A3B8; }
+    .pli-price { font-weight: 600; color: #1E293B; }
+
+    .pay-items-footer { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 4px; }
+    .pif-total { display: flex; flex-direction: column; font-size: 13px; color: #64748B; }
+    .pif-total strong { font-size: 18px; color: #1E293B; }
+</style>
+
+@code {
+    [Parameter] public OrderDto Order { get; set; } = default!;
+    [Parameter] public EventCallback OnPaymentCompleted { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private decimal RemainingAmount => Order.TotalAmount - Order.PaidAmount;
+    private decimal partialAmount = 0;
+    
+    // For Split Bill
+    private List<OrderItemDto> UnpaidItems => Order.Items.Where(i => i.StationStatus != OrderStatus.Paid && i.StationStatus != OrderStatus.Cancelled).ToList();
+    private HashSet<int> selectedItemIds = new();
+    private decimal selectedTotal = 0;
+
+    protected override void OnParametersSet()
+    {
+        // Init partial amount with remaining just in case
+        partialAmount = 0; 
+    }
+
+    private void ToggleItem(OrderItemDto item)
+    {
+        if (selectedItemIds.Contains(item.Id))
+            selectedItemIds.Remove(item.Id);
+        else
+            selectedItemIds.Add(item.Id);
+
+        CalculateSelectedTotal();
+    }
+
+    private void CalculateSelectedTotal()
+    {
+        selectedTotal = 0;
+        foreach (var id in selectedItemIds)
+        {
+            var item = Order.Items.FirstOrDefault(i => i.Id == id);
+            if (item != null)
+                selectedTotal += item.Quantity * item.UnitPrice;
+        }
+    }
+
+    private async Task ProcessPayment(decimal amount, string method)
+    {
+        if (amount <= 0) return;
+        if (amount > RemainingAmount) 
+        {
+            Snackbar.Add("Ödenecek tutar kalan tutardan fazla olamaz!", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/orders/{Order.Id}/payment", new PaymentRequestDto { Amount = amount });
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"{amount:N2} TL {method} ödemesi alındı.", Severity.Success);
+                await OnPaymentCompleted.InvokeAsync();
+            }
+            else
+            {
+                Snackbar.Add("Ödeme işlemi başarısız.", Severity.Error);
+            }
+        }
+        catch(Exception ex)
+        {
+            Snackbar.Add($"Hata: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ProcessItemPayment()
+    {
+        if (selectedItemIds.Count == 0) return;
+
+        try
+        {
+            var request = new ItemPaymentRequestDto { OrderItemIds = selectedItemIds.ToList() };
+            var response = await Http.PostAsJsonAsync($"api/orders/{Order.Id}/payment/items", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"{selectedItemIds.Count} ürün ödendi.", Severity.Success);
+                await OnPaymentCompleted.InvokeAsync();
+            }
+            else
+            {
+                Snackbar.Add("Ürün ödemesi başarısız.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Hata: {ex.Message}", Severity.Error);
+        }
+    }
+}

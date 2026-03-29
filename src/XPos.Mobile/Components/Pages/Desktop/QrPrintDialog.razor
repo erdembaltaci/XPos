@@ -1,0 +1,39 @@
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex flex-column align-center pa-4">
+            <MudText Typo="Typo.h5" Class="mb-4">@Title</MudText>
+            
+            <img src="@QrUrl" style="width: 300px; height: 300px; border: 1px solid #ccc; padding: 10px;" />
+            
+            <MudText Typo="Typo.body2" Class="mt-2 text-center" Style="word-break: break-all;">
+                @Link
+            </MudText>
+            
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                Bu barkodu yazdırıp masaya yapıştırabilirsiniz.
+            </MudAlert>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="DownloadAsPdf" Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PictureAsPdf" Class="mr-2">PDF Olarak İndir</MudButton>
+        <MudButton OnClick="Close" Color="Color.Primary">Kapat</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] IJSRuntime JSRuntime { get; set; }
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    
+    [Parameter] public string Title { get; set; }
+    [Parameter] public string QrUrl { get; set; }
+    [Parameter] public string Link { get; set; }
+
+    private void Close() => MudDialog.Close();
+
+    private async Task DownloadAsPdf()
+    {
+        await JSRuntime.InvokeVoidAsync("downloadQrAsPdf", QrUrl, Title);
+    }
+}

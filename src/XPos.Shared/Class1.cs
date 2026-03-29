@@ -1,0 +1,6 @@
+﻿namespace XPos.Shared;
+
+public class Class1
+{
+
+}

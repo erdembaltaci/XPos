@@ -1,0 +1,161 @@
+@page "/ml/recommendations"
+
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div class="d-flex align-center gap-3">
+        <MudIcon Icon="@Icons.Material.Filled.Recommend" Style="font-size:32px; color:#10B981;" />
+        <MudText Typo="Typo.h4" Style="font-weight:700;">Ürün Önerileri</MudText>
+        <MudChip T="string" Size="Size.Small" Style="background:#10B981; color:white;">Apriori</MudChip>
+    </div>
+</div>
+
+<MudGrid>
+    <!-- Product Selector -->
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4" Elevation="1" Style="border-radius:12px;">
+            <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:600;">Ürün Seçin</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Bir ürün seçerek, bu ürünle birlikte en çok sipariş edilen ürünleri görün.
+            </MudText>
+            <MudAutocomplete T="ProductDto" Label="Ürün Ara" @bind-Value="selectedProduct"
+                SearchFunc="SearchProducts" ToStringFunc="@(p => p?.Name ?? "")"
+                Variant="Variant.Outlined" Class="mb-3" />
+            <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" OnClick="GetRecommendations"
+                Disabled="@(selectedProduct == null || loading)" Style="border-radius:10px;">
+                @if (loading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Önerileri Getir
+            </MudButton>
+        </MudPaper>
+
+        <!-- Association Rules Summary -->
+        <MudPaper Class="pa-4 mt-4" Elevation="1" Style="border-radius:12px;">
+            <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:600;">Nasıl Çalışır?</MudText>
+            <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
+                <MudTimelineItem Color="Color.Success" Size="Size.Small">
+                    <MudText Typo="Typo.body2"><strong>1.</strong> Geçmiş sipariş verileri analiz edilir</MudText>
+                </MudTimelineItem>
+                <MudTimelineItem Color="Color.Success" Size="Size.Small">
+                    <MudText Typo="Typo.body2"><strong>2.</strong> Apriori algoritması ile birliktelik kuralları çıkarılır</MudText>
+                </MudTimelineItem>
+                <MudTimelineItem Color="Color.Success" Size="Size.Small">
+                    <MudText Typo="Typo.body2"><strong>3.</strong> "X alan Y de alır" örüntüleri belirlenir</MudText>
+                </MudTimelineItem>
+                <MudTimelineItem Color="Color.Success" Size="Size.Small">
+                    <MudText Typo="Typo.body2"><strong>4.</strong> QR menüde müşteriye otomatik öneri sunulur</MudText>
+                </MudTimelineItem>
+            </MudTimeline>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Recommendations -->
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-4" Elevation="1" Style="border-radius:12px;">
+            <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:600;">Öneri Sonuçları</MudText>
+
+            @if (recommendations.Any())
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    <strong>@selectedProduct?.Name</strong> alan müşteriler şunları da sipariş ediyor:
+                </MudText>
+
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">
+                    @foreach (var rec in recommendations)
+                    {
+                        <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="0"
+                            Style="border-radius:12px; background:#F0FDF4; border:1px solid #BBF7D0;">
+                            <MudIcon Icon="@Icons.Material.Filled.Fastfood" Style="font-size:36px; color:#10B981;" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mt-2 text-center">@rec.ProductName</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@rec.Price.ToString("C0", new System.Globalization.CultureInfo("tr-TR"))</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success">Güven: %@((rec.Confidence * 100).ToString("N0"))</MudText>
+                            <MudProgressLinear Value="@(rec.Confidence * 100)" Color="Color.Success" Rounded="true" Class="mt-2" />
+                            <MudChip T="string" Size="Size.Small" Class="mt-2" Style="font-size:11px;" Color="Color.Info">@rec.Reason</MudChip>
+                        </MudPaper>
+                    }
+                </div>
+            }
+            else if (!loading)
+            {
+                <div class="d-flex flex-column align-center py-8">
+                    <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Style="font-size:48px; color:#CBD5E1;" />
+                    <MudText Color="Color.Secondary" Class="mt-2">Soldaki panelden bir ürün seçin.</MudText>
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<ProductDto> products = new();
+    private ProductDto? selectedProduct;
+    private List<RecommendationItem> recommendations = new();
+    private bool loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { products = await Http.GetFromJsonAsync<List<ProductDto>>("api/products") ?? new(); } catch { }
+    }
+
+    private Task<IEnumerable<ProductDto>> SearchProducts(string? value, CancellationToken ct)
+    {
+        var result = string.IsNullOrEmpty(value)
+            ? products.AsEnumerable()
+            : products.Where(p => p.Name.Contains(value, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(result);
+    }
+
+    private async Task GetRecommendations()
+    {
+        if (selectedProduct == null) return;
+        loading = true;
+        recommendations.Clear();
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var payload = new
+            {
+                productId = selectedProduct.Id,
+                productName = selectedProduct.Name,
+                categoryId = selectedProduct.CategoryId,
+                allProducts = products.Where(p => p.IsActive).Select(p => new
+                {
+                    id = p.Id,
+                    name = p.Name,
+                    price = (double)p.Price,
+                    categoryId = p.CategoryId
+                }).ToList(),
+                limit = 8
+            };
+            var resp = await client.PostAsJsonAsync("/api/recommendations/dashboard", payload);
+            if (resp.IsSuccessStatusCode)
+            {
+                var result = await resp.Content.ReadFromJsonAsync<DashboardRecoResponse>();
+                if (result?.Recommendations != null)
+                    recommendations = result.Recommendations;
+            }
+            else
+            {
+                var body = await resp.Content.ReadAsStringAsync();
+                Snackbar.Add($"ML hata: {resp.StatusCode}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"ML servisine bağlanılamadı: {ex.Message}", Severity.Error);
+        }
+        loading = false;
+    }
+
+    private record DashboardRecoResponse(string Product, int Count, List<RecommendationItem> Recommendations);
+
+    private class RecommendationItem
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = "";
+        public double Price { get; set; }
+        public int CategoryId { get; set; }
+        public double Confidence { get; set; }
+        public string Reason { get; set; } = "";
+    }
+}

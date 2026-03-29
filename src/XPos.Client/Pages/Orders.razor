@@ -1,0 +1,167 @@
+@page "/orders"
+@using XPos.Shared.DTOs
+@using XPos.Shared.Enums
+@using XPos.Client.Services
+@inject HttpClient Http
+@inject CartService CartService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Siparişlerim | Lezzet Durağı</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4 pb-16">
+    <div class="d-flex align-center justify-center mb-6">
+        <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+        <MudText Typo="Typo.h4" Class="font-bold">Siparişlerim</MudText>
+    </div>
+
+    @if (string.IsNullOrEmpty(TableNumber))
+    {
+         <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="rounded-lg mb-4">
+             Masa numarası bulunamadı. Lütfen QR kodu tekrar okutun veya sepetten masa seçin.
+         </MudAlert>
+    }
+    else if (isLoading)
+    {
+        <div class="d-flex justify-center my-8">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </div>
+    }
+    else if (orders == null || !orders.Any())
+    {
+        <MudPaper Elevation="0" Class="py-16 d-flex flex-column align-center justify-center rounded-xl bg-transparent">
+             <MudIcon Icon="@Icons.Material.Outlined.Receipt" Size="Size.Large" Class="mb-4 text-muted" Style="font-size: 80px; opacity: 0.2;" />
+             <MudText Typo="Typo.h5" Class="font-bold mb-2">Henüz Sipariş Yok</MudText>
+             <MudText Typo="Typo.body1" Class="text-muted mb-6">Verdiğiniz siparişler burada görünecek.</MudText>
+             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Class="rounded-pill px-8" 
+                        StartIcon="@Icons.Material.Filled.RestaurantMenu" Href="/">
+                 Menüye Git
+             </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <div class="d-flex flex-column gap-4">
+            @foreach (var order in orders)
+            {
+                <MudCard Elevation="3" Class="rounded-xl overflow-hidden">
+                    <MudCardHeader Class="pb-2 bg-gray-50 border-b border-light">
+                        <CardHeaderContent>
+                            <div class="d-flex justify-space-between align-center">
+                                <div>
+                                    <MudText Typo="Typo.subtitle2" Class="text-muted">Sipariş #@order.Id</MudText>
+                                    <MudText Typo="Typo.caption" Class="text-muted">@order.CreatedAt.ToString("HH:mm")</MudText>
+                                </div>
+                                <MudChip T="string" Color="@GetStatusColor(order.Status)" Size="Size.Small" Class="font-bold">
+                                    @GetStatusText(order.Status)
+                                </MudChip>
+                            </div>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="pt-4">
+                        <MudList T="string" Dense="true">
+                            @foreach (var item in order.Items)
+                            {
+                                <MudListItem>
+                                    <div class="d-flex justify-space-between w-100">
+                                        <div class="d-flex gap-2">
+                                            <MudText Class="font-bold mr-2">@item.Quantity x</MudText>
+                                            <div>
+                                                <MudText>@item.ProductName</MudText>
+                                                @if (!string.IsNullOrEmpty(item.Note))
+                                                {
+                                                    <MudText Typo="Typo.caption" Class="text-muted d-block font-italic">Note: @item.Note</MudText>
+                                                }
+                                            </div>
+                                        </div>
+                                        <MudText Class="font-bold">@((item.Quantity * item.UnitPrice).ToString("C2"))</MudText>
+                                    </div>
+                                </MudListItem>
+                                <MudDivider Class="my-2" />
+                            }
+                        </MudList>
+                        
+                        <div class="d-flex justify-end mt-2">
+                            <MudText Typo="Typo.h6" Class="font-bold">Toplam: @order.TotalAmount.ToString("C2")</MudText>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </div>
+    }
+</MudContainer>
+
+<style>
+    .bg-gray-50 { background-color: #F9FAFB; }
+    .border-b { border-bottom-width: 1px; }
+    .border-light { border-color: #EAECF0 !important; }
+</style>
+
+@code {
+    private List<OrderDto>? orders;
+    private bool isLoading = true;
+    private string TableNumber => CartService.TableNumber ?? "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        CartService.OnChange += StateHasChanged;
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        if (string.IsNullOrEmpty(TableNumber)) 
+        {
+            isLoading = false;
+            return;
+        }
+
+        try
+        {
+            orders = await Http.GetFromJsonAsync<List<OrderDto>>($"api/orders/table/{TableNumber}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching orders: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        CartService.OnChange -= StateHasChanged;
+    }
+
+    private Color GetStatusColor(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Pending => Color.Warning,
+            OrderStatus.Preparing => Color.Info,
+            OrderStatus.Ready => Color.Success,
+            OrderStatus.Delivered => Color.Primary,
+
+            OrderStatus.Cancelled => Color.Error,
+            OrderStatus.Paid => Color.Success,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStatusText(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Pending => "Bekliyor",
+            OrderStatus.Preparing => "Hazırlanıyor",
+            OrderStatus.Ready => "Hazır",
+            OrderStatus.Delivered => "Teslim Edildi",
+
+            OrderStatus.Cancelled => "İptal",
+            OrderStatus.Paid => "Ödendi",
+            _ => status.ToString()
+        };
+    }
+}

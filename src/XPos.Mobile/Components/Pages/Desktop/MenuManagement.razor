@@ -1,0 +1,147 @@
+@page "/desktop/menu"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Menü Yönetimi</MudText>
+
+    <MudTable Items="@Products" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading" LoadingProgressColor="Color.Info"
+              Filter="new Func<ProductDto,bool>(FilterFunc)">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Ürünler</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="searchString" Placeholder="Ara..." Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenCategoryDialog" Class="ml-4">Kategoriler</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog" Class="ml-2">Yeni Ürün</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Görsel</MudTh>
+            <MudTh>Ürün Adı</MudTh>
+            <MudTh>Kategori</MudTh>
+            <MudTh>Fiyat</MudTh>
+            <MudTh>Açıklama</MudTh>
+            <MudTh>İşlemler</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Görsel">
+                <!-- <MudAvatar Image="@context.ImageUrl" Size="Size.Medium" Rounded="true" /> -->
+                @if (!string.IsNullOrEmpty(context.ImageUrl))
+                {
+                    <MudImage Src="@context.ImageUrl" Height="40" Width="40" ObjectFit="ObjectFit.Cover" Class="rounded" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Medium" />
+                }
+            </MudTd>
+            <MudTd DataLabel="Ürün Adı">@context.Name</MudTd>
+            <MudTd DataLabel="Kategori">@GetCategoryName(context.CategoryId)</MudTd>
+            <MudTd DataLabel="Fiyat">@context.Price.ToString("C2")</MudTd>
+            <MudTd DataLabel="Açıklama">@context.Description</MudTd>
+            <MudTd DataLabel="İşlemler">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(() => OpenEditDialog(context))" Size="Size.Small" Class="mr-2" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteProduct(context))" Size="Size.Small" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<ProductDto> Products = new();
+    private List<CategoryDto> Categories = new();
+    private string searchString = "";
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            Categories = await Http.GetFromJsonAsync<List<CategoryDto>>("api/categories") ?? new();
+            Products = await Http.GetFromJsonAsync<List<ProductDto>>("api/products") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Veri yüklenemedi: {ex.Message}", Severity.Error);
+        }
+        _loading = false;
+    }
+
+    private string GetCategoryName(int id) => Categories.FirstOrDefault(c => c.Id == id)?.Name ?? "-";
+
+    private bool FilterFunc(ProductDto element) => FilterFunc(element, searchString);
+
+    private bool FilterFunc(ProductDto element, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString)) return true;
+        if (element.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase)) return true;
+        if (element.Description?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true) return true;
+        return false;
+    }
+
+    private async Task OpenEditDialog(ProductDto product)
+    {
+        var parameters = new DialogParameters 
+        { 
+            ["Categories"] = Categories,
+            ["Product"] = product
+        };
+        var dialog = DialogService.Show<AddProductDialog>("Ürün Düzenle", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task DeleteProduct(ProductDto item)
+    {
+        var confirm = await DialogService.ShowMessageBox("Sil", $"{item.Name} ürününü silmek istediğinize emin misiniz?", yesText: "Sil", cancelText: "İptal");
+        if (confirm == true)
+        {
+            var response = await Http.DeleteAsync($"api/products/{item.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Products.Remove(item);
+                Snackbar.Add("Ürün silindi", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Silme işlemi başarısız", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters { ["Categories"] = Categories };
+        var dialog = DialogService.Show<AddProductDialog>("Yeni Ürün Ekle", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData(); // Reload list
+        }
+    }
+
+    private async Task OpenCategoryDialog()
+    {
+        var parameters = new DialogParameters { ["Categories"] = Categories };
+        var dialog = DialogService.Show<CategoriesDialog>("Kategori Yönetimi", parameters);
+        var result = await dialog.Result;
+        
+        // Reload in case categories changed
+        await LoadData();
+    }
+}

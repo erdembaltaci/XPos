@@ -1,0 +1,261 @@
+@page "/ml/campaigns"
+
+@inject ISnackbar Snackbar
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div class="d-flex align-center gap-3">
+        <MudIcon Icon="@Icons.Material.Filled.Campaign" Style="font-size:32px; color:#8B5CF6;" />
+        <MudText Typo="Typo.h4" Style="font-weight:700;">AI Kampanyalar</MudText>
+        @if (isActive)
+        {
+            <MudChip T="string" Size="Size.Small" Style="background:#4CAF50; color:white;">Aktif</MudChip>
+        }
+        else
+        {
+            <MudChip T="string" Size="Size.Small" Style="background:#9E9E9E; color:white;">Pasif</MudChip>
+        }
+    </div>
+    <MudButton Variant="Variant.Filled" Style="background:#8B5CF6; color:white; border-radius:10px; text-transform:none;"
+        OnClick="GetNewSuggestion" Disabled="@loading" StartIcon="@Icons.Material.Filled.AutoAwesome">
+        @if (loading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+        Yeni Öneri
+    </MudButton>
+</div>
+
+<MudGrid>
+    @* ── Active Campaign ── *@
+    @if (isActive && activeCampaign != null)
+    {
+        <MudItem xs="12">
+            <MudPaper Class="pa-6" Elevation="3" Style="border-radius:16px; border-left:6px solid #4CAF50; background:linear-gradient(135deg, #E8F5E9, #F1F8E9);">
+                <div class="d-flex justify-space-between align-start flex-wrap gap-3">
+                    <div style="flex:1; min-width:280px;">
+                        <div class="d-flex align-center gap-2 mb-2">
+                            <MudChip T="string" Size="Size.Small" Style="background:#4CAF50; color:white; font-weight:700;">✅ AKTİF KAMPANYA</MudChip>
+                        </div>
+                        <MudText Typo="Typo.h5" Style="font-weight:800; color:#1B5E20;" Class="mb-2">@activeCampaign.Title</MudText>
+                        <MudText Typo="Typo.body1" Style="color:#33691E; font-size:1.05rem;">@activeCampaign.Description</MudText>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            @if (activeCampaign.DiscountPercent > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Style="background:#FF5722; color:white; font-weight:700;">%@activeCampaign.DiscountPercent İndirim</MudChip>
+                            }
+                            @foreach (var cat in activeCampaign.TargetCategories ?? new())
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="border-color:#4CAF50; color:#2E7D32;">@cat</MudChip>
+                            }
+                        </div>
+                        <MudText Typo="Typo.caption" Class="mt-2" Style="color:#558B2F;">📋 Koşul: @activeCampaign.Condition</MudText>
+                        <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-3" NoIcon="false">
+                            Müşteriler QR menüde bu kampanyayı görüyor — eşleşen ürünlere indirim otomatik uygulanıyor!
+                        </MudAlert>
+                    </div>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Medium"
+                        Style="border-radius:10px; text-transform:none; font-weight:600;" OnClick="DeactivateCampaign"
+                        StartIcon="@Icons.Material.Filled.PowerOff">
+                        Devre Dışı Bırak
+                    </MudButton>
+                </div>
+            </MudPaper>
+        </MudItem>
+    }
+
+    @* ── AI Suggestion (only shown when no active campaign) ── *@
+    @if (!isActive && suggestion != null)
+    {
+        <MudItem xs="12">
+            <MudPaper Class="pa-6" Elevation="2" Style="@($"border-radius:16px; border-left:6px solid {suggestion.Color}; background:linear-gradient(135deg, #F3E5F5, #EDE7F6);")">
+                <div class="d-flex justify-space-between align-start flex-wrap gap-3">
+                    <div style="flex:1; min-width:280px;">
+                        <div class="d-flex align-center gap-2 mb-2">
+                            <MudChip T="string" Size="Size.Small" Style="background:#8B5CF6; color:white; font-weight:700;">💡 AI Önerisi</MudChip>
+                            <MudText Typo="Typo.caption" Style="color:#6A1B9A;">Mevcut koşullara göre en uygun kampanya</MudText>
+                        </div>
+                        <MudText Typo="Typo.h5" Style="font-weight:800; color:#4A148C;" Class="mb-2">@suggestion.Title</MudText>
+                        <MudText Typo="Typo.body1" Style="color:#6A1B9A; font-size:1.05rem;">@suggestion.Description</MudText>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            @if (suggestion.DiscountPercent > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Style="background:#FF5722; color:white; font-weight:700;">%@suggestion.DiscountPercent İndirim</MudChip>
+                            }
+                            @foreach (var cat in suggestion.TargetCategories ?? new())
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="border-color:#8B5CF6; color:#6A1B9A;">@cat</MudChip>
+                            }
+                        </div>
+                        <MudText Typo="Typo.caption" Class="mt-2" Style="color:#7B1FA2;">📋 Koşul: @suggestion.Condition</MudText>
+                    </div>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Large"
+                        Style="border-radius:10px; text-transform:none; font-weight:700; min-width:180px;" OnClick="ActivateCampaign"
+                        StartIcon="@Icons.Material.Filled.PowerSettingsNew">
+                        Etkinleştir
+                    </MudButton>
+                </div>
+            </MudPaper>
+        </MudItem>
+    }
+
+    @if (!isActive && suggestion == null && !loading)
+    {
+        <MudItem xs="12">
+            <MudPaper Class="pa-6 d-flex flex-column align-center" Elevation="1" Style="border-radius:12px;">
+                <MudIcon Icon="@Icons.Material.Filled.Campaign" Style="font-size:48px; color:#CBD5E1;" />
+                <MudText Color="Color.Secondary" Class="mt-2">Kampanya önerisi bulunamadı. "Yeni Öneri" butonuna basın.</MudText>
+            </MudPaper>
+        </MudItem>
+    }
+
+    @* ── How it works ── *@
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-4" Elevation="1" Style="border-radius:12px;">
+            <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:600;">Kampanya Nasıl Çalışır?</MudText>
+            <MudList T="string" Dense="true">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.AutoAwesome" IconColor="Color.Secondary">
+                    AI hava, saat ve güne göre kampanya önerir
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.PowerSettingsNew" IconColor="Color.Success">
+                    "Etkinleştir" ile kampanyayı aktifleştirirsiniz
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.QrCode" IconColor="Color.Info">
+                    Müşteriler QR menüde aktif kampanyayı görür
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Discount" IconColor="Color.Warning">
+                    Eşleşen ürünlere indirim otomatik uygulanır
+                </MudListItem>
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Receipt" IconColor="Color.Primary">
+                    İndirimli fiyat siparişe yansır
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+    </MudItem>
+
+    @* ── History ── *@
+    <MudItem xs="12" md="7">
+        <MudPaper Class="pa-4" Elevation="1" Style="border-radius:12px;">
+            <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:600;">Kampanya Geçmişi</MudText>
+            @if (campaignHistory.Any())
+            {
+                <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
+                    @foreach (var h in campaignHistory)
+                    {
+                        <MudTimelineItem Color="@(h.IsActivation ? Color.Success : Color.Error)" Size="Size.Small" TimelineAlign="TimelineAlign.End">
+                            <ItemContent>
+                                <MudPaper Class="pa-3" Elevation="0" Style="@($"background:{(h.IsActivation ? "#F1F8E9" : "#FBE9E7")}; border-radius:8px;")">
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;">@h.Text</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@h.Timestamp.ToString("dd.MM.yyyy HH:mm")</MudText>
+                                </MudPaper>
+                            </ItemContent>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            }
+            else
+            {
+                <div class="d-flex flex-column align-center py-6">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Style="font-size:48px; color:#CBD5E1;" />
+                    <MudText Color="Color.Secondary" Class="mt-2">Henüz kampanya geçmişi yok.</MudText>
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private CampaignData? activeCampaign;
+    private CampaignData? suggestion;
+    private bool isActive;
+    private List<HistoryItem> campaignHistory = new();
+    private bool loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadActiveCampaign();
+        if (!isActive)
+            await GetNewSuggestion();
+    }
+
+    private async Task LoadActiveCampaign()
+    {
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var result = await client.GetFromJsonAsync<ActiveResponse>("/api/campaigns/active");
+            if (result?.Active == true && result.Campaign != null)
+            {
+                activeCampaign = result.Campaign;
+                isActive = true;
+            }
+            else
+            {
+                isActive = false;
+                activeCampaign = null;
+            }
+        }
+        catch { isActive = false; }
+    }
+
+    private async Task GetNewSuggestion()
+    {
+        loading = true;
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var hour = DateTime.Now.Hour;
+            var result = await client.GetFromJsonAsync<SuggestResponse>($"/api/campaigns/suggest?hour={hour}");
+            suggestion = result?.Suggestion;
+            if (suggestion != null)
+                Snackbar.Add("Yeni kampanya önerisi hazır!", Severity.Info);
+            else
+                Snackbar.Add("Uygun kampanya bulunamadı.", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"ML servisine bağlanılamadı: {ex.Message}", Severity.Error);
+        }
+        loading = false;
+    }
+
+    private async Task ActivateCampaign()
+    {
+        if (suggestion == null) return;
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var response = await client.PostAsJsonAsync("/api/campaigns/activate", suggestion);
+            if (response.IsSuccessStatusCode)
+            {
+                activeCampaign = suggestion;
+                isActive = true;
+                suggestion = null;
+                campaignHistory.Insert(0, new HistoryItem($"✅ Etkinleştirildi: {activeCampaign.Title}", DateTime.Now, true));
+                if (campaignHistory.Count > 15) campaignHistory = campaignHistory.Take(15).ToList();
+                Snackbar.Add("Kampanya etkinleştirildi! Müşteriler artık görebilir.", Severity.Success);
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"Hata: {ex.Message}", Severity.Error); }
+    }
+
+    private async Task DeactivateCampaign()
+    {
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var response = await client.PostAsync("/api/campaigns/deactivate", null);
+            if (response.IsSuccessStatusCode)
+            {
+                campaignHistory.Insert(0, new HistoryItem($"⛔ Devre dışı bırakıldı: {activeCampaign?.Title}", DateTime.Now, false));
+                if (campaignHistory.Count > 15) campaignHistory = campaignHistory.Take(15).ToList();
+                activeCampaign = null;
+                isActive = false;
+                await GetNewSuggestion();
+                Snackbar.Add("Kampanya devre dışı bırakıldı.", Severity.Warning);
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"Hata: {ex.Message}", Severity.Error); }
+    }
+
+    private record ActiveResponse(bool Active, CampaignData? Campaign);
+    private record SuggestResponse(CampaignData? Suggestion);
+    private record CampaignData(string Id, string Title, string Description, int DiscountPercent, List<string> TargetCategories, string Condition, int Priority, string Color);
+    private record HistoryItem(string Text, DateTime Timestamp, bool IsActivation);
+}

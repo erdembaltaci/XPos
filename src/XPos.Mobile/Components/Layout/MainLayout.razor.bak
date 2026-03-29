@@ -1,0 +1,219 @@
+﻿@inherits LayoutComponentBase
+@using XPos.Mobile.Services
+@using XPos.Mobile.Themes
+@inject AuthStateService Auth
+@inject NavigationManager Nav
+
+<MudThemeProvider Theme="AdminTheme.DefaultTheme" IsDarkMode="@(!IsDesktop)" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+@if (IsDesktop)
+{
+    <!-- DESKTOP KASA LAYOUT -->
+    <div class="desktop-shell">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">
+                    <MudIcon Icon="@Icons.Material.Filled.PointOfSale" Style="font-size:26px; color:white;" />
+                </div>
+                <span class="logo-text">XPos Kasa</span>
+            </div>
+
+            <div class="sidebar-nav">
+                <div class="nav-section-title">GENEL</div>
+                <a class="sidebar-link @(IsActive("/") ? "active" : "")" @onclick='() => Nav.NavigateTo("/")'>
+                    <MudIcon Icon="@Icons.Material.Filled.Dashboard" Style="font-size:20px;" />
+                    <span>Dashboard</span>
+                </a>
+                <a class="sidebar-link @(IsActive("/d/tables") ? "active" : "")" @onclick='() => Nav.NavigateTo("/d/tables")'>
+                    <MudIcon Icon="@Icons.Material.Filled.TableRestaurant" Style="font-size:20px;" />
+                    <span>Masalar</span>
+                </a>
+                <a class="sidebar-link @(IsActive("/d/orders") ? "active" : "")" @onclick='() => Nav.NavigateTo("/d/orders")'>
+                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Style="font-size:20px;" />
+                    <span>Siparişler</span>
+                </a>
+
+                <div class="nav-section-title" style="margin-top:24px;">YÖNETİM</div>
+                <a class="sidebar-link @(IsActive("/d/products") ? "active" : "")" @onclick='() => Nav.NavigateTo("/d/products")'>
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Style="font-size:20px;" />
+                    <span>Ürünler</span>
+                </a>
+                <a class="sidebar-link @(IsActive("/desktop/staff") ? "active" : "")" @onclick='() => Nav.NavigateTo("/desktop/staff")'>
+                    <MudIcon Icon="@Icons.Material.Filled.People" Style="font-size:20px;" />
+                    <span>Personel</span>
+                </a>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Area -->
+        <div class="desktop-main">
+            <!-- Top Header -->
+            <header class="desktop-header">
+                <div class="header-breadcrumb">
+                    <MudIcon Icon="@Icons.Material.Outlined.Home" Style="font-size:18px; color:#94A3B8;" />
+                    <span style="color:#94A3B8;">/</span>
+                    <span style="color:#334155; font-weight:500;">@GetPageTitle()</span>
+                </div>
+                <div class="header-right">
+                    <div class="header-user">
+                        <div class="user-avatar">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Style="font-size:18px; color:#1677FF;" />
+                        </div>
+                        <span class="user-name">Kasa</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content -->
+            <div class="desktop-content">
+                <ErrorBoundary @ref="errorBoundary">
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent Context="ex">
+                        <MudAlert Severity="Severity.Error">Beklenmeyen bir hata oluştu: @ex.Message</MudAlert>
+                        <MudButton OnClick="() => errorBoundary.Recover()" Variant="Variant.Filled" Color="Color.Primary">Yeniden Dene</MudButton>
+                    </ErrorContent>
+                </ErrorBoundary>
+            </div>
+        </div>
+    </div>
+}
+else if (!Auth.IsLoggedIn)
+{
+    @Body
+}
+else
+{
+    <!-- MOBILE GARSON LAYOUT -->
+    <div class="app-shell">
+        <div class="app-content">
+            @Body
+        </div>
+        <nav class="bottom-nav">
+            <a class="nav-item @(IsActive("/") ? "active" : "")" @onclick='() => Nav.NavigateTo("/")'>
+                <MudIcon Icon="@Icons.Material.Filled.TableRestaurant" Size="Size.Small" />
+                <span>Masalar</span>
+            </a>
+            <a class="nav-item @(IsActive("/orders") ? "active" : "")" @onclick='() => Nav.NavigateTo("/orders")'>
+                <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Small" />
+                <span>Siparişler</span>
+            </a>
+            <a class="nav-item logout" @onclick="Logout">
+                <MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />
+                <span>Çıkış</span>
+            </a>
+        </nav>
+    </div>
+}
+
+<style>
+    * { -webkit-tap-highlight-color: transparent; }
+
+    /* ========== MOBILE ========== */
+    .app-shell { display: flex; flex-direction: column; height: 100vh; background: #0F172A; color: #E2E8F0; }
+    .app-content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+    .bottom-nav { display: flex; background: #1E293B; border-top: 1px solid rgba(255,255,255,0.06); padding: 6px 0; padding-bottom: env(safe-area-inset-bottom, 6px); }
+    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; font-size: 11px; color: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.2s ease; text-decoration: none; }
+    .nav-item.active { color: #818CF8; }
+    .nav-item.active .mud-icon-root { color: #818CF8 !important; }
+    .nav-item.logout { color: rgba(239,68,68,0.6); }
+    .nav-item.logout .mud-icon-root { color: rgba(239,68,68,0.6) !important; }
+
+    /* ========== DESKTOP ========== */
+    .desktop-shell { display: flex; height: 100vh; background: #F8FAFC; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
+
+    .sidebar {
+        width: 260px; background: #1E293B; display: flex; flex-direction: column; flex-shrink: 0;
+        border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    .sidebar-logo {
+        display: flex; align-items: center; gap: 12px; padding: 20px 24px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .logo-icon {
+        width: 40px; height: 40px; border-radius: 10px;
+        background: linear-gradient(135deg, #1677FF, #4096FF);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .logo-text { font-size: 20px; font-weight: 700; color: white; letter-spacing: -0.5px; }
+
+    .sidebar-nav { padding: 16px 12px; flex: 1; }
+    .nav-section-title {
+        font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.3);
+        letter-spacing: 1px; padding: 8px 12px 6px; text-transform: uppercase;
+    }
+    .sidebar-link {
+        display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+        border-radius: 8px; color: rgba(255,255,255,0.6); cursor: pointer;
+        transition: all 0.15s ease; margin-bottom: 2px; text-decoration: none;
+        font-size: 14px; font-weight: 500;
+    }
+    .sidebar-link:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); }
+    .sidebar-link.active {
+        background: rgba(22,119,255,0.12); color: #4096FF;
+    }
+    .sidebar-link.active .mud-icon-root { color: #4096FF !important; }
+
+    .desktop-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .desktop-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 12px 28px; background: white;
+        border-bottom: 1px solid #E2E8F0; flex-shrink: 0;
+    }
+    .header-breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .header-user { display: flex; align-items: center; gap: 8px; }
+    .user-avatar {
+        width: 34px; height: 34px; border-radius: 8px; background: #EFF6FF;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .user-name { font-size: 14px; font-weight: 500; color: #334155; }
+
+    .desktop-content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+</style>
+
+@code {
+    private ErrorBoundary errorBoundary;
+    
+    private bool IsDesktop =>
+        DeviceInfo.Current.Platform == DevicePlatform.WinUI ||
+        DeviceInfo.Current.Platform == DevicePlatform.macOS;
+
+    protected override void OnInitialized()
+    {
+        if (!IsDesktop && !Auth.IsLoggedIn) Nav.NavigateTo("/login", replace: true);
+    }
+
+    private bool IsActive(string path)
+    {
+        var uri = Nav.ToBaseRelativePath(Nav.Uri);
+        if (path == "/") return string.IsNullOrEmpty(uri);
+        return uri.StartsWith(path.TrimStart('/'));
+    }
+
+    private string GetPageTitle()
+    {
+        var uri = Nav.ToBaseRelativePath(Nav.Uri);
+        return uri switch
+        {
+            "" => "Dashboard",
+            _ when uri.StartsWith("d/tables") => "Masalar",
+            _ when uri.StartsWith("d/orders") => "Siparişler",
+            _ when uri.StartsWith("d/products") => "Ürünler",
+            _ => "Dashboard"
+        };
+    }
+
+    private void Logout()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/login", replace: true);
+    }
+}

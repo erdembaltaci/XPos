@@ -1,0 +1,202 @@
+@page "/login"
+@using MudBlazor
+@using XPos.Shared.DTOs
+@layout NoLayout
+@inject AuthStateService Auth
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject HttpClient Http
+
+<div class="login-container">
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="login-card animate-scale-up">
+        <div class="header-section mb-8">
+            <div class="logo-wrapper">
+                <div class="logo-icon">
+                    <MudIcon Icon="@Icons.Material.Filled.PointOfSale" Size="Size.Large" Color="Color.Inherit" />
+                </div>
+            </div>
+            <h1 class="welcome-text">XPos Mobil</h1>
+            <p class="subtitle-text">Lütfen giriş bilgilerinizi yazın</p>
+        </div>
+
+        <div class="input-group">
+            <div class="input-field">
+                <MudIcon Icon="@Icons.Material.Filled.Phone" Class="field-icon" />
+                <input type="text" placeholder="Telefon No" @bind="loginDto.Phone" />
+            </div>
+            <div class="input-field">
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Class="field-icon" />
+                <input type="password" placeholder="Şifre" @bind="loginDto.Password" />
+            </div>
+        </div>
+
+        <button class="login-btn mt-8" @onclick="HandleLogin" disabled="@isLoggingIn">
+            @if (isLoggingIn)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Inherit" />
+            }
+            else
+            {
+                <span>Giriş Yap</span>
+            }
+        </button>
+    </div>
+</div>
+
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
+        --surface-glass: rgba(30, 41, 59, 0.7);
+        --border-glass: rgba(255, 255, 255, 0.1);
+    }
+
+    .login-container { 
+        min-height: 100vh; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        background-color: #0F172A;
+        font-family: 'Outfit', sans-serif;
+        padding: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .background-blobs .blob {
+        position: absolute;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+        filter: blur(60px);
+        z-index: 0;
+    }
+    .blob-1 { top: -100px; right: -100px; animation: float 20s infinite alternate; }
+    .blob-2 { bottom: -100px; left: -100px; animation: float 15s infinite alternate-reverse; }
+
+    @@keyframes float { 
+        from { transform: translate(0, 0); } 
+        to { transform: translate(100px, 100px); } 
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 440px;
+        background: var(--surface-glass);
+        backdrop-filter: blur(30px);
+        border: 1px solid var(--border-glass);
+        border-radius: 48px;
+        padding: 60px 32px;
+        text-align: center;
+        position: relative;
+        z-index: 20;
+        box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.6);
+    }
+
+    .logo-wrapper { margin-bottom: 24px; display: inline-block; padding: 4px; border-radius: 20px; background: rgba(255,255,255,0.05); }
+    .logo-icon { 
+        width: 56px; height: 56px; background: var(--primary-gradient);
+        border-radius: 16px; display: flex; align-items: center; justify-content: center; color: white;
+        box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+    }
+
+    .welcome-text { color: white; font-size: 2.5rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+    .subtitle-text { color: #94A3B8; font-size: 1rem; }
+
+    .input-group { display: flex; flex-direction: column; gap: 16px; margin-top: 40px; }
+    .input-field {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        height: 64px;
+        transition: all 0.3s;
+    }
+    .input-field:focus-within {
+        border-color: #6366F1;
+        background: rgba(255,255,255,0.06);
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+    }
+    .field-icon { color: rgba(255,255,255,0.3); margin-right: 12px; }
+    .input-field input {
+        background: none; border: none; outline: none; color: white; flex: 1; font-size: 16px;
+    }
+    .input-field input::placeholder { color: rgba(255,255,255,0.2); }
+
+    .login-btn {
+        width: 100%; height: 64px; border-radius: 20px; background: var(--primary-gradient);
+        color: white; font-size: 18px; font-weight: 700; border: none; cursor: pointer;
+        transition: all 0.3s; box-shadow: 0 15px 30px rgba(99, 102, 241, 0.3);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .login-btn:hover { transform: translateY(-3px); box-shadow: 0 20px 40px rgba(99, 102, 241, 0.4); }
+    .login-btn:active { transform: scale(0.96); }
+    .login-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .animate-scale-up { animation: scaleUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    @@keyframes scaleUp { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+</style>
+
+@code {
+    private LoginDto loginDto = new();
+    private bool isLoggingIn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.TryRestoreSession();
+        if (Auth.IsLoggedIn) NavigateToHome();
+    }
+
+    private async Task HandleLogin()
+    {
+        if (string.IsNullOrWhiteSpace(loginDto.Phone) || string.IsNullOrWhiteSpace(loginDto.Password))
+        {
+            Snackbar.Add("Lütfen telefon ve şifrenizi girin.", Severity.Warning);
+            return;
+        }
+
+        isLoggingIn = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await Auth.TryLogin(loginDto.Phone, loginDto.Password);
+            if (success)
+            {
+                NavigateToHome();
+            }
+            else
+            {
+                Snackbar.Add("Giriş bilgileri hatalı.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Bağlantı hatası oluştu: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            isLoggingIn = false;
+            StateHasChanged();
+        }
+    }
+
+    private void NavigateToHome()
+    {
+        if (Auth.Role == "Admin") Nav.NavigateTo("/desktop/dashboard");
+        else if (Auth.Role == "Kitchen") Nav.NavigateTo("/desktop/station");
+        else Nav.NavigateTo("/tables");
+    }
+
+    private class LoginDto
+    {
+        public string Phone { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}

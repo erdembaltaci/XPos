@@ -1,0 +1,61 @@
+antecedent,consequent,support,confidence,lift,leverage,conviction
+Yunan Salatası,Tiramisu,0.017,0.1504,1.3217,0.0041,1.0431
+Tiramisu,Yunan Salatası,0.017,0.1491,1.3217,0.0041,1.0427
+Somon Izgara,San Sebastian Cheesecake,0.013,0.113,1.2865,0.0029,1.0284
+San Sebastian Cheesecake,Somon Izgara,0.013,0.1477,1.2865,0.0029,1.0386
+Profiterol,Yunan Salatası,0.0115,0.1411,1.2506,0.0023,1.0329
+Yunan Salatası,Profiterol,0.0115,0.1018,1.2506,0.0023,1.0227
+Tavuk Şiş,Bolonez Spagetti,0.0145,0.1629,1.2268,0.0027,1.036
+Bolonez Spagetti,Tavuk Şiş,0.0145,0.109,1.2268,0.0027,1.0226
+Bruschetta,Soğan Halkası,0.0115,0.1353,1.2207,0.0021,1.0283
+Soğan Halkası,Bruschetta,0.0115,0.1036,1.2207,0.0021,1.0209
+Double Smash Burger,Izgara Köfte,0.0115,0.1237,1.2201,0.0021,1.0255
+Izgara Köfte,Double Smash Burger,0.0115,0.1133,1.2201,0.0021,1.0231
+Ton Balıklı Salata,Yunan Salatası,0.0135,0.1371,1.2147,0.0024,1.0281
+Yunan Salatası,Ton Balıklı Salata,0.0135,0.1195,1.2147,0.0024,1.024
+Yunan Salatası,Çay,0.0115,0.1018,1.2134,0.002,1.0199
+Çay,Yunan Salatası,0.0115,0.1369,1.2134,0.002,1.0279
+Çay,Mojito,0.012,0.1429,1.2125,0.0021,1.0292
+Mojito,Çay,0.012,0.1017,1.2125,0.0021,1.0198
+San Sebastian Cheesecake,Mojito,0.0125,0.142,1.2056,0.0021,1.0282
+Mojito,San Sebastian Cheesecake,0.0125,0.1059,1.2056,0.0021,1.0202
+Ton Balıklı Salata,Tavuk Wrap,0.016,0.1624,1.1962,0.0026,1.0318
+Tavuk Wrap,Ton Balıklı Salata,0.016,0.1176,1.1962,0.0026,1.0219
+Mojito,Somon Izgara,0.016,0.1356,1.1808,0.0024,1.024
+Somon Izgara,Mojito,0.016,0.1391,1.1808,0.0024,1.0248
+Profiterol,Somon Izgara,0.011,0.135,1.1754,0.0016,1.0233
+Yunan Salatası,Ev Yapımı Limonata,0.016,0.1416,1.1671,0.0023,1.0236
+Ev Yapımı Limonata,Yunan Salatası,0.016,0.1317,1.1671,0.0023,1.0217
+Mojito,Yunan Salatası,0.0155,0.1314,1.1642,0.0022,1.0213
+Yunan Salatası,Mojito,0.0155,0.1372,1.1642,0.0022,1.0224
+Izgara Köfte,Tavuk Şiş,0.0105,0.1034,1.1641,0.0015,1.0163
+Tavuk Şiş,Izgara Köfte,0.0105,0.118,1.1641,0.0015,1.0189
+Bruschetta,Ev Yapımı Limonata,0.012,0.1412,1.1637,0.0017,1.0231
+Tavuk Burger,Double Smash Burger,0.012,0.1057,1.1386,0.0015,1.0144
+Double Smash Burger,Tavuk Burger,0.012,0.129,1.1386,0.0015,1.018
+Çay,Kanat (8 Adet),0.0115,0.1369,1.1285,0.0013,1.0181
+Latte,Mojito,0.0115,0.1329,1.1284,0.0013,1.0174
+Fettuccine Alfredo,Tavuk Wrap,0.0105,0.1522,1.1206,0.0011,1.0193
+Tavuk Şiş,Tavuk Wrap,0.0135,0.1517,1.117,0.0014,1.0187
+Somon Izgara,Ton Balıklı Salata,0.0125,0.1087,1.1052,0.0012,1.0116
+Ton Balıklı Salata,Somon Izgara,0.0125,0.1269,1.1052,0.0012,1.0138
+Çay,Tiramisu,0.0105,0.125,1.0981,0.0009,1.0128
+San Sebastian Cheesecake,Tiramisu,0.011,0.125,1.0981,0.001,1.0128
+Double Smash Burger,Yunan Salatası,0.0115,0.1237,1.0959,0.001,1.0124
+Yunan Salatası,Double Smash Burger,0.0115,0.1018,1.0959,0.001,1.0099
+Karidesli Makarna,Tavuk Wrap,0.011,0.1486,1.0946,0.0009,1.0151
+Tavuk Şiş,Tavuk Burger,0.011,0.1236,1.0906,0.0009,1.0117
+Tavuk Wrap,Somon Izgara,0.017,0.125,1.0886,0.0014,1.0116
+Somon Izgara,Tavuk Wrap,0.017,0.1478,1.0886,0.0014,1.0141
+Profiterol,Tavuk Wrap,0.012,0.1472,1.0843,0.0009,1.0134
+San Sebastian Cheesecake,Soğan Halkası,0.0105,0.1193,1.0766,0.0007,1.0096
+Double Smash Burger,Tavuk Wrap,0.0135,0.1452,1.069,0.0009,1.011
+Soğan Halkası,Izgara Köfte,0.012,0.1081,1.0667,0.0007,1.0076
+Izgara Köfte,Soğan Halkası,0.012,0.1182,1.0667,0.0007,1.0084
+Ev Yapımı Limonata,Izgara Köfte,0.013,0.107,1.0557,0.0007,1.0063
+Izgara Köfte,Ev Yapımı Limonata,0.013,0.1281,1.0557,0.0007,1.0078
+Double Smash Burger,Bolonez Spagetti,0.013,0.1398,1.0526,0.0006,1.0081
+Izgara Köfte,Tavuk Wrap,0.0145,0.1429,1.052,0.0007,1.0082
+Tavuk Wrap,Izgara Köfte,0.0145,0.1066,1.052,0.0007,1.0059
+Ton Balıklı Salata,Izgara Köfte,0.0105,0.1066,1.0518,0.0005,1.0059
+Izgara Köfte,Ton Balıklı Salata,0.0105,0.1034,1.0518,0.0005,1.0057

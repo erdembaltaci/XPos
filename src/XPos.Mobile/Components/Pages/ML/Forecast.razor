@@ -1,0 +1,315 @@
+@page "/ml/forecast"
+@using System.Text.Json
+@using System.Text.Json.Serialization
+
+@inject ISnackbar Snackbar
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div class="d-flex align-center gap-3">
+        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Style="font-size:32px; color:#6366F1;" />
+        <MudText Typo="Typo.h4" Style="font-weight:700;">Satış Tahmini</MudText>
+        <MudChip T="string" Size="Size.Small" Style="background:#6366F1; color:white;">AI</MudChip>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="RetrainModel" Disabled="@retraining"
+                   StartIcon="@Icons.Material.Filled.ModelTraining" Style="border-radius:10px; text-transform:none;">
+            @if (retraining) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Modeli Yeniden Eğit
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RunForecast" Disabled="@loading"
+                   StartIcon="@Icons.Material.Filled.AutoGraph" Style="border-radius:10px; text-transform:none;">
+            @if (loading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Tahmin Oluştur
+        </MudButton>
+    </div>
+</div>
+
+<MudGrid>
+    <!-- Config & Data Source Info -->
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4 mb-4" Elevation="1" Style="border-radius:12px;">
+            <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:600;">⚙️ Parametreler</MudText>
+            <MudNumericField @bind-Value="forecastDays" Label="Tahmin Günü" Min="1" Max="90" Class="mb-3" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Linear Regression modeli ile gelecek @forecastDays günün satış tahmini oluşturulur.
+            </MudText>
+        </MudPaper>
+
+        <MudPaper Class="pa-4 mb-4" Elevation="1" Style="border-radius:12px;">
+            <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:600;">📊 Veri Kaynakları</MudText>
+            @if (stats != null)
+            {
+                <div class="d-flex flex-column gap-2">
+                    <div style="background:#EEF2FF; border-radius:8px; padding:10px 14px;">
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.caption" Style="font-weight:600; color:#4338CA;">🗄️ Gerçek Siparişler (DB)</MudText>
+                            <MudChip T="string" Size="Size.Small" Style="background:#4338CA; color:white; height:20px; font-size:0.7rem;">@stats.DbDays gün</MudChip>
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size:0.7rem;">@stats.DbDateRange</MudText>
+                        @if (stats.DbTotalRevenue > 0)
+                        {
+                            <MudText Typo="Typo.caption" Style="font-weight:600; color:#059669; font-size:0.75rem;">Toplam: ₺@stats.DbTotalRevenue.ToString("N0")</MudText>
+                        }
+                    </div>
+                    <div style="background:#FFF7ED; border-radius:8px; padding:10px 14px;">
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.caption" Style="font-weight:600; color:#C2410C;">📄 Sentetik Veri (CSV)</MudText>
+                            <MudChip T="string" Size="Size.Small" Style="background:#C2410C; color:white; height:20px; font-size:0.7rem;">@stats.CsvDays gün</MudChip>
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size:0.7rem;">Başlangıç eğitim verisi</MudText>
+                    </div>
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2" Style="font-size:0.7rem;">
+                    💡 Gerçek siparişler 3x ağırlıkla eğitime dahil edilir. Sipariş arttıkça tahminler daha isabetli olur.
+                </MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Veri kaynağı bilgisi yükleniyor...</MudText>
+            }
+        </MudPaper>
+
+        @if (forecasts.Any())
+        {
+            <MudPaper Class="pa-4" Elevation="1" Style="border-radius:12px;">
+                <MudText Typo="Typo.h6" Class="mb-2" Style="font-weight:600;">📈 Özet</MudText>
+                <div class="d-flex flex-column gap-2">
+                    <div style="background:linear-gradient(135deg,#EEF2FF,#E0E7FF); border-radius:10px; padding:14px;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Tahmini Ciro</MudText>
+                        <MudText Typo="Typo.h5" Style="font-weight:800; color:#4338CA;">₺@forecasts.Sum(f => f.PredictedAmount).ToString("N0")</MudText>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <div style="flex:1; background:#F0FDF4; border-radius:10px; padding:12px;">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size:0.7rem;">Günlük Ort.</MudText>
+                            <MudText Style="font-weight:700; color:#059669;">₺@forecasts.Average(f => f.PredictedAmount).ToString("N0")</MudText>
+                        </div>
+                        <div style="flex:1; background:#FFF7ED; border-radius:10px; padding:12px;">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size:0.7rem;">En Yüksek</MudText>
+                            <MudText Style="font-weight:700; color:#C2410C;">₺@forecasts.Max(f => f.PredictedAmount).ToString("N0")</MudText>
+                        </div>
+                    </div>
+                </div>
+            </MudPaper>
+        }
+    </MudItem>
+
+    <!-- Results -->
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-4" Elevation="1" Style="border-radius:12px;">
+            <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:600;">Tahmin Sonuçları</MudText>
+            @if (forecasts.Any())
+            {
+                <MudSimpleTable Dense="true" Elevation="0" Style="border-radius:8px; overflow:hidden;">
+                    <thead>
+                        <tr style="background:#F8FAFC;">
+                            <th>Tarih</th>
+                            <th>Gün</th>
+                            <th>🌤️</th>
+                            <th style="text-align:right">Tahmini Ciro</th>
+                            <th style="min-width:200px;">Grafik</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ var max = forecasts.Max(f => f.PredictedAmount); }
+                        @foreach (var f in forecasts)
+                        {
+                            var pct = max > 0 ? (f.PredictedAmount / max * 100) : 0;
+                            var isWeekend = f.Date.DayOfWeek == DayOfWeek.Saturday || f.Date.DayOfWeek == DayOfWeek.Sunday;
+                            var rowStyle = isWeekend ? "background:rgba(99,102,241,0.04);" : "";
+                            <tr style="@rowStyle">
+                                <td style="font-weight:500;">@f.Date.ToString("dd.MM.yyyy")</td>
+                                <td>
+                                    @f.Date.ToString("dddd", new System.Globalization.CultureInfo("tr-TR"))
+                                    @if (isWeekend) { <MudChip T="string" Size="Size.Small" Style="background:#EEF2FF; color:#4338CA; height:18px; font-size:0.6rem; margin-left:4px;">HaftaSonu</MudChip> }
+                                </td>
+                                <td>@GetWeatherEmoji(f.Weather)</td>
+                                <td style="text-align:right; font-weight:700; color:#4338CA;">₺@f.PredictedAmount.ToString("N0")</td>
+                                <td>
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <div style="flex:1; background:#F1F5F9; border-radius:6px; height:16px; overflow:hidden;">
+                                            <div style="width:@(pct.ToString("F0"))%; height:100%; background:linear-gradient(90deg, #6366F1, #A78BFA); border-radius:6px; transition:width 0.5s;"></div>
+                                        </div>
+                                        <span style="font-size:0.7rem; color:#94A3B8; min-width:32px;">%@(pct.ToString("F0"))</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+            else if (!loading)
+            {
+                <div class="d-flex flex-column align-center py-8">
+                    <MudIcon Icon="@Icons.Material.Filled.Analytics" Style="font-size:48px; color:#CBD5E1;" />
+                    <MudText Color="Color.Secondary" Class="mt-2">"Tahmin Oluştur" butonuna tıklayarak başlayın.</MudText>
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int forecastDays = 14;
+    private bool loading;
+    private bool retraining;
+    private List<ForecastItem> forecasts = new();
+    private ForecastStats? stats;
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStats();
+    }
+
+    private async Task LoadStats()
+    {
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var json = await client.GetStringAsync("/api/forecast/stats");
+            stats = JsonSerializer.Deserialize<ForecastStats>(json, JsonOpts);
+        }
+        catch { /* ignore */ }
+    }
+
+    private async Task RunForecast()
+    {
+        loading = true;
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var json = await client.GetStringAsync($"/api/forecast?days={forecastDays}");
+            var response = JsonSerializer.Deserialize<ForecastResponse>(json, JsonOpts);
+            if (response?.Forecasts != null)
+            {
+                forecasts = response.Forecasts.Select(f => new ForecastItem(
+                    DateTime.Parse(f.Date),
+                    (decimal)f.PredictedRevenue,
+                    f.Weather,
+                    f.IsWeekend
+                )).ToList();
+                Snackbar.Add($"✅ {forecasts.Count} günlük tahmin oluşturuldu!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"ML servisine bağlanılamadı: {ex.Message}", Severity.Error);
+        }
+        loading = false;
+    }
+
+    private async Task RetrainModel()
+    {
+        retraining = true;
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var resp = await client.PostAsync("/api/forecast/retrain", null);
+            var json = await resp.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<RetrainResponse>(json, JsonOpts);
+            if (result?.Status == "ok")
+            {
+                Snackbar.Add($"✅ Model yeniden eğitildi! ({result.TrainingRows} satır, R²: {result.R2Score})", Severity.Success);
+                await LoadStats();
+            }
+            else
+            {
+                Snackbar.Add($"Hata: {result?.Message}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Retrain hatası: {ex.Message}", Severity.Error);
+        }
+        retraining = false;
+    }
+
+    private string GetWeatherEmoji(string weather)
+    {
+        return weather switch
+        {
+            "Güneşli" => "☀️",
+            "Bulutlu" => "⛅",
+            "Serin" => "🌥️",
+            "Yağmurlu" => "🌧️",
+            "Soğuk/Karlı" => "❄️",
+            _ => "🌤️"
+        };
+    }
+
+    // ── DTOs ──
+    private class ForecastResponse
+    {
+        [JsonPropertyName("forecasts")]
+        public List<ForecastApiItem> Forecasts { get; set; } = new();
+
+        [JsonPropertyName("total_predicted_revenue")]
+        public double TotalPredictedRevenue { get; set; }
+
+        [JsonPropertyName("daily_average")]
+        public double DailyAverage { get; set; }
+
+        [JsonPropertyName("forecast_days")]
+        public int ForecastDays { get; set; }
+    }
+
+    private class ForecastApiItem
+    {
+        [JsonPropertyName("date")]
+        public string Date { get; set; } = "";
+
+        [JsonPropertyName("day")]
+        public string Day { get; set; } = "";
+
+        [JsonPropertyName("weather")]
+        public string Weather { get; set; } = "";
+
+        [JsonPropertyName("temperature")]
+        public double Temperature { get; set; }
+
+        [JsonPropertyName("predicted_revenue")]
+        public double PredictedRevenue { get; set; }
+
+        [JsonPropertyName("is_weekend")]
+        public bool IsWeekend { get; set; }
+    }
+
+    private class ForecastStats
+    {
+        [JsonPropertyName("db_days")]
+        public int DbDays { get; set; }
+
+        [JsonPropertyName("csv_days")]
+        public int CsvDays { get; set; }
+
+        [JsonPropertyName("db_date_range")]
+        public string DbDateRange { get; set; } = "";
+
+        [JsonPropertyName("db_total_revenue")]
+        public double DbTotalRevenue { get; set; }
+
+        [JsonPropertyName("model_exists")]
+        public bool ModelExists { get; set; }
+    }
+
+    private class RetrainResponse
+    {
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "";
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = "";
+
+        [JsonPropertyName("training_rows")]
+        public int TrainingRows { get; set; }
+
+        [JsonPropertyName("r2_score")]
+        public double R2Score { get; set; }
+    }
+
+    private record ForecastItem(DateTime Date, decimal PredictedAmount, string Weather = "Güneşli", bool IsWeekend = false);
+}

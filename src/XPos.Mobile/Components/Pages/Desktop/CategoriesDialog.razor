@@ -1,0 +1,86 @@
+@using System.Net.Http.Json
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex gap-2 mb-4">
+            <MudTextField @bind-Value="newCategoryName" Label="Yeni Kategori Adı" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddCategory" Disabled="@string.IsNullOrWhiteSpace(newCategoryName)">Ekle</MudButton>
+        </div>
+
+        <MudTable Items="@Categories" Dense="true" Hover="true" Breakpoint="Breakpoint.None" Height="300px" FixedHeader="true">
+            <HeaderContent>
+                <MudTh>Kategori Adı</MudTh>
+                <MudTh>İşlem</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Kategori Adı">@context.Name</MudTd>
+                <MudTd DataLabel="İşlem">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteCategory(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Kapat</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public List<CategoryDto> Categories { get; set; } = new();
+
+    private string newCategoryName;
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(true));
+
+    private async Task AddCategory()
+    {
+        if (string.IsNullOrWhiteSpace(newCategoryName)) return;
+
+        var newCat = new CategoryDto { Name = newCategoryName, ImageUrl = "https://via.placeholder.com/150", StationId = 1 }; // Default Station 1
+        try
+        {
+            var res = await Http.PostAsJsonAsync("api/categories", newCat);
+            if (res.IsSuccessStatusCode)
+            {
+                var created = await res.Content.ReadFromJsonAsync<CategoryDto>();
+                Categories.Add(created);
+                newCategoryName = "";
+                Snackbar.Add("Kategori eklendi", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Hata: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteCategory(CategoryDto cat)
+    {
+        var confirm = await DialogService.ShowMessageBox("Sil", $"{cat.Name} kategorisini silmek istediğinize emin misiniz?", yesText: "Sil", cancelText: "İptal");
+        if (confirm == true)
+        {
+            try
+            {
+                var res = await Http.DeleteAsync($"api/categories/{cat.Id}");
+                if (res.IsSuccessStatusCode)
+                {
+                    Categories.Remove(cat);
+                    Snackbar.Add("Kategori silindi", Severity.Success);
+                }
+                else
+                {
+                     Snackbar.Add("Silinemedi (Ürünleri olabilir)", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Hata: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

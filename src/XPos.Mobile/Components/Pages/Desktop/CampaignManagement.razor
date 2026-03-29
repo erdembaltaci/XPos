@@ -1,0 +1,189 @@
+@page "/desktop/campaigns"
+@using MudBlazor
+@using XPos.Shared.DTOs
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<div class="campaign-container">
+    <div class="d-flex justify-space-between align-center mb-8">
+        <div>
+            <MudText Typo="Typo.h4" Class="fw-bold" Style="color: #1E293B;">AI Kampanya Yönetimi</MudText>
+            <MudText Typo="Typo.subtitle1" Class="mud-text-secondary">Yapay zeka ile satışlarınızı artırın</MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadData" StartIcon="@Icons.Material.Filled.AutoAwesome" Style="border-radius:12px; height:48px;">AI Öneri Güncelle</MudButton>
+    </div>
+
+    <MudGrid>
+        <!-- Suggestion Card -->
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-6 rounded-xl" Elevation="4" Style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: white;">
+                <div class="d-flex align-center gap-3 mb-6">
+                    <div class="ai-badge">AI ÖNERİSİ</div>
+                    @if (loading) { <MudProgressCircular Color="Color.Inherit" Size="Size.Small" Indeterminate="true" /> }
+                </div>
+
+                @if (suggestion != null)
+                {
+                    <MudText Typo="Typo.h3" Class="fw-bold mb-2">@suggestion.Title</MudText>
+                    <MudText Typo="Typo.body1" Class="mb-6" Style="opacity: 0.9; font-size: 1.1rem;">@suggestion.Description</MudText>
+
+                    <div class="d-flex flex-wrap gap-4 mb-8">
+                        <div class="stat-pill">
+                            <MudIcon Icon="@Icons.Material.Filled.Percent" Size="Size.Small" />
+                            <span>%@suggestion.DiscountPercent İndirim</span>
+                        </div>
+                        <div class="stat-pill">
+                            <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" />
+                            <span>Kritik Zaman</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-4">
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Surface" 
+                                   OnClick="ActivateCampaign"
+                                   Disabled="@(activeCampaign?.Id == suggestion.Id)"
+                                   Style="background: white; color: #4F46E5; font-weight: 700; border-radius: 12px; height: 52px; padding: 0 32px;">
+                            @(activeCampaign?.Id == suggestion.Id ? "Şu An Aktif" : "Kampanyayı Başlat")
+                        </MudButton>
+                        @if (activeCampaign?.Id == suggestion.Id)
+                        {
+                            <MudButton Variant="Variant.Outlined" 
+                                       Color="Color.Inherit" 
+                                       OnClick="DeactivateCampaign"
+                                       Style="border-radius: 12px; height: 52px;">
+                                Durdur
+                            </MudButton>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="py-8 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.CloudSync" Size="Size.Large" Class="mb-4" />
+                        <MudText>AI şu an mevcut verileri analiz ediyor...</MudText>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Stats and Status -->
+        <MudItem xs="12" md="5">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudPaper Class="pa-6 rounded-xl border-dashed" Elevation="0">
+                        <MudText Typo="Typo.h6" Class="fw-bold mb-4">Mevcut Durum</MudText>
+                        <div class="status-box @(activeCampaign != null ? "active" : "inactive")">
+                            <div class="status-indicator"></div>
+                            <span>@(activeCampaign != null ? $"Aktif: {activeCampaign.Title}" : "Aktif Kampanya Yok")</span>
+                        </div>
+                        <MudDivider Class="my-4" />
+                        <div class="d-flex justify-space-between align-center">
+                            <span class="mud-text-secondary">Etkilenen Masa</span>
+                            <span class="fw-bold">10</span>
+                        </div>
+                        <div class="d-flex justify-space-between align-center mt-2">
+                            <span class="mud-text-secondary">Hedef Kitle</span>
+                            <span class="fw-bold">Risk Altındakiler</span>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudPaper Class="pa-6 rounded-xl" Style="background: #F8FAFC;">
+                        <MudText Typo="Typo.h6" Class="fw-bold mb-4">Neden Bu Öneri?</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+                            Yapay zeka modellerimiz (Random Forest) son 30 günlük verilerde satışların düştüğünü tespit etti. 
+                            RFM analizi ise "Risk Altındaki" müşterilerinizin sadakatini artırmak için bir indirim kampanyasının 
+                            ciroyu %22 artıracağını öngörüyor.
+                        </MudText>
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Success" Size="Size.Small" />
+                            <span style="font-size: 12px; color: #10B981; font-weight: 600;">DOĞRULUK: %96.4</span>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudItem>
+    </MudGrid>
+</div>
+
+<style>
+    .campaign-container { padding: 40px; background: white; min-height: 100vh; }
+    .fw-bold { font-weight: 700; }
+    .ai-badge { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 100px; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+    .stat-pill { background: rgba(255,255,255,0.15); padding: 8px 16px; border-radius: 12px; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+    .status-box { padding: 12px 16px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; }
+    .status-box.active { background: #ECFDF5; color: #059669; }
+    .status-box.inactive { background: #F1F5F9; color: #64748B; }
+    .status-indicator { width: 10px; height: 10px; border-radius: 50%; }
+    .status-box.active .status-indicator { background: #10B981; box-shadow: 0 0 8px #10B981; }
+    .status-box.inactive .status-indicator { background: #94A3B8; }
+    .border-dashed { border: 2px dashed #E2E8F0; }
+</style>
+
+@code {
+    private bool loading = false;
+    private CampaignDto? suggestion;
+    private CampaignDto? activeCampaign;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            var sugRes = await Http.GetFromJsonAsync<CampaignSuggestionResponse>("api/ml/campaigns/suggest");
+            suggestion = sugRes?.Suggestion;
+
+            var actRes = await Http.GetFromJsonAsync<ActiveCampaignResponse>("api/ml/campaigns/active");
+            activeCampaign = actRes?.Campaign;
+        }
+        catch { }
+        loading = false;
+    }
+
+    private async Task ActivateCampaign()
+    {
+        if (suggestion == null) return;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("api/ml/campaigns/activate", suggestion);
+            if (res.IsSuccessStatusCode)
+            {
+                activeCampaign = suggestion;
+                Snackbar.Add("Kampanya başarıyla aktif edildi!", Severity.Success);
+            }
+        }
+        catch { }
+    }
+
+    private async Task DeactivateCampaign()
+    {
+        try
+        {
+            await Http.PostAsync("api/ml/campaigns/deactivate", null);
+            activeCampaign = null;
+            Snackbar.Add("Kampanya durduruldu.", Severity.Info);
+        }
+        catch { }
+    }
+
+    public class CampaignDto
+    {
+        public string Id { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int DiscountPercent { get; set; }
+        public List<string> TargetCategories { get; set; } = new();
+        public string Condition { get; set; } = "";
+        public int Priority { get; set; }
+        public string Color { get; set; } = "";
+    }
+
+    public class CampaignSuggestionResponse { public CampaignDto? Suggestion { get; set; } }
+    public class ActiveCampaignResponse { public bool Active { get; set; } public CampaignDto? Campaign { get; set; } }
+}

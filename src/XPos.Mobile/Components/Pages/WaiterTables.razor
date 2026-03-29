@@ -1,0 +1,199 @@
+@inject HttpClient Http
+@inject AuthStateService AuthService
+@inject NavigationManager Nav
+
+<!-- Header -->
+<div class="tables-header">
+    <div class="header-row">
+        <div>
+            <h1 class="header-title">Masalar</h1>
+            <div class="waiter-badge">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+                @AuthService.WaiterName
+            </div>
+        </div>
+        <button class="refresh-btn" @onclick="LoadTables">
+            <MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Medium" Style="color:white;" />
+        </button>
+    </div>
+    <!-- Stats -->
+    <div class="stats-container">
+        <div class="stat-glass-chip">
+            <div class="stat-indicator empty"></div>
+            <div class="stat-content">
+                <span class="stat-val">@emptyCount</span>
+                <span class="stat-lab">Boş</span>
+            </div>
+        </div>
+        <div class="stat-glass-chip">
+            <div class="stat-indicator occupied"></div>
+            <div class="stat-content">
+                <span class="stat-val">@occupiedCount</span>
+                <span class="stat-lab">Dolu</span>
+            </div>
+        </div>
+        <div class="stat-glass-chip">
+            <div class="stat-indicator pending"></div>
+            <div class="stat-content">
+                <span class="stat-val">@pendingCount</span>
+                <span class="stat-lab">Onay</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Table Grid -->
+<div class="grid-container">
+    @if (isLoading)
+    {
+        <div class="loader-overlay">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" Style="color:#6366F1;" />
+            <MudText Class="mt-4" Style="color:rgba(255,255,255,0.5)">Masalar yükleniyor...</MudText>
+        </div>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var t in tables)
+            {
+                <MudItem xs="4">
+                    <div class="premium-card @GetCardClass(t)" @onclick='() => Nav.NavigateTo($"/table/{t.Id}")'>
+                        <div class="card-glass-overlay"></div>
+                        <div class="card-content">
+                            <div class="table-label">@t.TableNumber</div>
+                            <div class="table-capacity">@t.Capacity Kişilik</div>
+                            
+                            @if (t.HasPendingOrder)
+                            {
+                                <div class="status-glow-badge alert">ONAY BEKLIYOR</div>
+                            }
+                            else if (t.IsOccupied && t.CurrentOrderAmount.HasValue)
+                            {
+                                <div class="amount-display">@t.CurrentOrderAmount.Value.ToString("N0") ₺</div>
+                            }
+                        </div>
+                    </div>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</div>
+
+<style>
+    /* Premium Header */
+    .tables-header { 
+        padding: 32px 20px 24px; 
+        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+    .header-title { margin: 0; font-size: 32px; font-weight: 900; color: #FFFFFF; letter-spacing: -1.5px; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+    
+    .waiter-badge { 
+        display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 8px;
+        background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2);
+        color: #A5B4FC; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 4px;
+    }
+
+    .refresh-btn { 
+        width: 48px; height: 48px; border-radius: 16px; 
+        border: 1px solid rgba(255,255,255,0.1); 
+        background: rgba(255,255,255,0.05); 
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.2s;
+    }
+    .refresh-btn:active { transform: rotate(180deg) scale(0.9); background: rgba(255,255,255,0.15); }
+
+    /* Stats Chips */
+    .stats-container { display: flex; gap: 12px; }
+    .stat-glass-chip { 
+        flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px; 
+        border-radius: 16px; background: rgba(15, 23, 42, 0.6); 
+        border: 1px solid rgba(255,255,255,0.05); backdrop-filter: blur(10px);
+    }
+    .stat-indicator { width: 4px; height: 24px; border-radius: 2px; }
+    .stat-indicator.empty { background: #64748B; }
+    .stat-indicator.occupied { background: #10B981; box-shadow: 0 0 10px rgba(16,185,129,0.5); }
+    .stat-indicator.pending { background: #F59E0B; box-shadow: 0 0 10px rgba(245,158,11,0.5); }
+    
+    .stat-val { display: block; font-size: 18px; font-weight: 800; color: #F8FAFC; line-height: 1; }
+    .stat-lab { display: block; font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-top: 2px; }
+
+    /* Premium Grid & Cards */
+    .grid-container { padding: 20px; min-height: 400px; position: relative; }
+    .loader-overlay { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 80px; }
+
+    .premium-card { 
+        position: relative; overflow: hidden; height: 110px;
+        background: #1E293B; border-radius: 24px; 
+        border: 1px solid rgba(255,255,255,0.06); 
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .card-glass-overlay { 
+        position: absolute; inset: 0; 
+        background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%); 
+    }
+    .card-content { 
+        position: relative; z-index: 1; height: 100%;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 12px 4px; text-align: center;
+    }
+
+    .premium-card:active { transform: scale(0.92); filter: brightness(1.2); }
+
+    /* Card States */
+    .premium-card.occupied { 
+        border-color: #10B981; 
+        background: linear-gradient(135deg, #1E293B 0%, rgba(16, 185, 129, 0.15) 100%);
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+    }
+    .premium-card.pending-card { 
+        border-color: #F59E0B; 
+        background: linear-gradient(135deg, #1E293B 0%, rgba(245, 158, 11, 0.15) 100%);
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.1);
+    }
+
+    /* Typography inside cards */
+    .table-label { font-size: 16px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; }
+    .table-capacity { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.3); text-transform: uppercase; margin-top: 2px; }
+    
+    .status-glow-badge { 
+        font-size: 8px; font-weight: 900; padding: 4px 8px; border-radius: 6px; margin-top: 12px;
+        background: #F59E0B; color: #0F172A; box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+    }
+    
+    .amount-display { 
+        font-size: 15px; font-weight: 900; color: #10B981; margin-top: 10px;
+        text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+    }
+</style>
+
+@code {
+    private List<XPos.Shared.DTOs.TableDto> tables = new();
+    private bool isLoading = true;
+    private int emptyCount, occupiedCount, pendingCount;
+
+    protected override async Task OnInitializedAsync() => await LoadTables();
+
+    private async Task LoadTables()
+    {
+        isLoading = true;
+        try
+        {
+            tables = await Http.GetFromJsonAsync<List<XPos.Shared.DTOs.TableDto>>("api/tables") ?? new();
+            emptyCount = tables.Count(t => !t.IsOccupied && !t.HasPendingOrder);
+            occupiedCount = tables.Count(t => t.IsOccupied);
+            pendingCount = tables.Count(t => t.HasPendingOrder);
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private string GetCardClass(XPos.Shared.DTOs.TableDto t)
+    {
+        if (t.HasPendingOrder) return "pending-card";
+        if (t.IsOccupied) return "occupied";
+        return "";
+    }
+}

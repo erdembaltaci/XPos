@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json.schemastore.org/sarif-1.0.0",
+  "version": "1.0.0",
+  "runs": [
+    {
+      "tool": {
+        "name": "Microsoft (R) Visual C# Compiler",
+        "version": "4.14.0.0",
+        "fileVersion": "4.14.0-3.26064.1 (450493a9)",
+        "semanticVersion": "4.14.0",
+        "language": "en-US"
+      },
+      "results": [
+        {
+          "ruleId": "RZ10001",
+          "level": "error",
+          "message": "The type of component 'MudChip' cannot be inferred based on the values provided. Consider specifying the type arguments directly using the following attributes: 'T'.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///C:/Users/erdem/OneDrive/Masa%C3%BCst%C3%BC/XPos/src/XPos.Client/Pages/Reports.razor",
+                "region": {
+                  "startLine": 113,
+                  "startColumn": 33,
+                  "endLine": 113,
+                  "endColumn": 147
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CA2211",
+          "level": "note",
+          "message": "Non-constant fields should not be visible",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///C:/Users/erdem/OneDrive/Masa%C3%BCst%C3%BC/XPos/src/XPos.Client/Themes/MantisTheme.cs",
+                "region": {
+                  "startLine": 7,
+                  "startColumn": 32,
+                  "endLine": 7,
+                  "endColumn": 44
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "CA1860",
+          "level": "note",
+          "message": "Prefer comparing 'Count' to 0 rather than using 'Any()', both for clarity and for performance",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///C:/Users/erdem/OneDrive/Masa%C3%BCst%C3%BC/XPos/src/XPos.Client/Services/CartService.cs",
+                "region": {
+                  "startLine": 78,
+                  "startColumn": 14,
+                  "endLine": 78,
+                  "endColumn": 25
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1,
+            "customProperties": {
+              "DiagnosticPropertyKey": "Count"
+            }
+          }
+        }
+      ],
+      "rules": {
+        "CA1860": {
+          "id": "CA1860",
+          "shortDescription": "Avoid using 'Enumerable.Any()' extension method",
+          "fullDescription": "Prefer using 'IsEmpty', 'Count' or 'Length' properties whichever available, rather than calling 'Enumerable.Any()'. The intent is clearer and it is more performant than using 'Enumerable.Any()' extension method.",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1860",
+          "properties": {
+            "category": "Performance",
+            "isEnabledByDefault": true,
+            "tags": [
+              "Telemetry",
+              "EnabledRuleInAggressiveMode"
+            ]
+          }
+        },
+        "CA2211": {
+          "id": "CA2211",
+          "shortDescription": "Non-constant fields should not be visible",
+          "fullDescription": "Static fields that are neither constants nor read-only are not thread-safe. Access to such a field must be carefully controlled and requires advanced programming techniques to synchronize access to the class object.",
+          "defaultLevel": "note",
+          "helpUri": "https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2211",
+          "properties": {
+            "category": "Usage",
+            "isEnabledByDefault": true,
+            "tags": [
+              "PortedFromFxCop",
+              "Telemetry",
+              "EnabledRuleInAggressiveMode"
+            ]
+          }
+        },
+        "RZ10001": {
+          "id": "RZ10001",
+          "shortDescription": "The type of component 'MudChip' cannot be inferred based on the values provided. Consider specifying the type arguments directly using the following attributes: 'T'.",
+          "defaultLevel": "error",
+          "properties": {
+            "category": "Razor",
+            "isEnabledByDefault": true
+          }
+        }
+      }
+    }
+  ]
+}

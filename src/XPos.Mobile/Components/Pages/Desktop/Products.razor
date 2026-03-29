@@ -1,0 +1,120 @@
+@page "/d/products"
+@inject HttpClient Http
+
+<div class="dp-header">
+    <h2 class="dp-title">Ürünler</h2>
+    <div class="dp-search">
+        <MudIcon Icon="@Icons.Material.Filled.Search" Style="font-size:18px; color:#94A3B8;" />
+        <input type="text" @bind="searchTerm" @bind:event="oninput" placeholder="Ürün ara..." class="dp-search-input" />
+    </div>
+</div>
+
+<!-- Category Chips -->
+<div class="dp-cats">
+    <button class="dp-cat @(selectedCatId == null ? "active" : "")" @onclick="() => selectedCatId = null">Tümü</button>
+    @foreach (var cat in categories)
+    {
+        <button class="dp-cat @(selectedCatId == cat.Id ? "active" : "")" @onclick="() => selectedCatId = cat.Id">@cat.Name</button>
+    }
+</div>
+
+<div class="dp-table-card">
+    @if (isLoading)
+    {
+        <div style="text-align:center; padding:48px;">
+            <MudProgressCircular Indeterminate="true" Size="Size.Medium" Color="Color.Primary" />
+        </div>
+    }
+    else
+    {
+        <table class="dp-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Ürün Adı</th>
+                    <th>Kategori</th>
+                    <th>Fiyat</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in FilteredProducts)
+                {
+                    <tr>
+                        <td class="text-muted">#@p.Id</td>
+                        <td class="fw-600">@p.Name</td>
+                        <td><span class="dp-cat-chip">@GetCategoryName(p.CategoryId)</span></td>
+                        <td class="fw-600" style="color:#1677FF;">@p.Price.ToString("N2") ₺</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (!FilteredProducts.Any())
+        {
+            <div class="dp-empty">
+                <MudIcon Icon="@Icons.Material.Outlined.Inventory2" Style="font-size:36px; color:#CBD5E1;" />
+                <p>Ürün bulunamadı</p>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .dp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .dp-title { margin: 0; font-size: 20px; font-weight: 600; color: #1E293B; }
+    .dp-search { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: white; width: 280px; }
+    .dp-search-input { border: none; outline: none; font-size: 14px; flex: 1; color: #334155; background: transparent; }
+
+    .dp-cats { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .dp-cat { padding: 6px 14px; border-radius: 6px; border: 1px solid #E2E8F0; background: white; font-size: 13px; font-weight: 500; color: #64748B; cursor: pointer; }
+    .dp-cat.active { background: #1677FF; color: white; border-color: #1677FF; }
+    .dp-cat:hover:not(.active) { background: #F8FAFC; }
+
+    .dp-table-card { background: white; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
+    .dp-table { width: 100%; border-collapse: collapse; }
+    .dp-table th { text-align: left; padding: 10px 20px; font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; background: #FAFBFC; }
+    .dp-table td { padding: 14px 20px; font-size: 14px; color: #334155; border-top: 1px solid #F1F5F9; }
+    .dp-table tr:hover td { background: #FAFBFC; }
+    .fw-600 { font-weight: 600; }
+    .text-muted { color: #94A3B8; }
+
+    .dp-cat-chip { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 6px; background: #F1F5F9; color: #64748B; }
+    .dp-empty { text-align: center; padding: 40px; color: #94A3B8; }
+    .dp-empty p { margin-top: 8px; }
+</style>
+
+@code {
+    private List<ProductDto> products = new();
+    private List<CategoryDto> categories = new();
+    private bool isLoading = true;
+    private int? selectedCatId;
+    private string searchTerm = "";
+
+    private IEnumerable<ProductDto> FilteredProducts
+    {
+        get
+        {
+            var q = products.AsEnumerable();
+            if (selectedCatId.HasValue) q = q.Where(p => p.CategoryId == selectedCatId.Value);
+            if (!string.IsNullOrWhiteSpace(searchTerm)) q = q.Where(p => p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+            return q;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var t1 = Http.GetFromJsonAsync<List<ProductDto>>("api/products");
+            var t2 = Http.GetFromJsonAsync<List<CategoryDto>>("api/categories");
+            await Task.WhenAll(t1, t2);
+            products = await t1 ?? new();
+            categories = await t2 ?? new();
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private string GetCategoryName(int id) => categories.FirstOrDefault(c => c.Id == id)?.Name ?? "-";
+}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Lezzet Durağı | Online Menü</title>
+    <base href="/" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="css/app.css?v=premium1" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="XPos.Client.styles.css?v=kiraz2" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <div class="d-flex justify-content-center align-items-center vh-100 bg-light">
+            <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Yükleniyor...</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Hata oluştu.
+        <a href="" class="reload">Yenile</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script>
+        window.scrollToElement = (elementId) => {
+            var element = document.getElementById(elementId);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+    </script>
+</body>
+
+</html>

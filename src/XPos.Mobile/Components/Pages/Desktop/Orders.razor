@@ -1,0 +1,187 @@
+@page "/d/orders"
+@inject HttpClient Http
+
+<div class="do-header">
+    <h2 class="do-title">Siparişler</h2>
+    <div class="do-actions">
+        <div class="do-filters">
+            <button class="do-filter @(filter == null ? "active" : "")" @onclick="() => filter = null">Tümü</button>
+            <button class="do-filter @(filter == "active" ? "active" : "")" @onclick='() => filter = "active"'>Aktif</button>
+            <button class="do-filter @(filter == "pending" ? "active" : "")" @onclick='() => filter = "pending"'>Onay Bek.</button>
+            <button class="do-filter @(filter == "completed" ? "active" : "")" @onclick='() => filter = "completed"'>Tamamlanan</button>
+        </div>
+        <button class="do-refresh" @onclick="LoadData">
+            <MudIcon Icon="@Icons.Material.Filled.Refresh" Style="font-size:18px; color:#64748B;" />
+        </button>
+    </div>
+</div>
+
+<div class="do-table-card">
+    @if (isLoading)
+    {
+        <div style="text-align:center; padding:48px;">
+            <MudProgressCircular Indeterminate="true" Size="Size.Medium" Color="Color.Primary" />
+        </div>
+    }
+    else
+    {
+        <table class="do-table">
+            <thead>
+                <tr>
+                    <th>Sipariş</th>
+                    <th>Masa</th>
+                    <th>Ürün Sayısı</th>
+                    <th>Toplam</th>
+                    <th>Ödenen</th>
+                    <th>Kalan</th>
+                    <th>Durum</th>
+                    <th>Tarih</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in FilteredOrders)
+                {
+                    <tr class="@(expandedId == o.Id ? "expanded" : "")">
+                        <td class="fw-600">#@o.Id</td>
+                        <td>@o.TableNumber</td>
+                        <td class="text-muted">@o.Items.Count ürün</td>
+                        <td class="fw-600">@o.TotalAmount.ToString("N2") TL</td>
+                        <td style="color:#52C41A;">@o.PaidAmount.ToString("N2") TL</td>
+                        <td style="color:#FF4D4F; font-weight:600;">@((o.TotalAmount - o.PaidAmount).ToString("N2")) TL</td>
+                        <td><span class="status-chip @GetChipClass(o.Status)">@GetStatusText(o.Status)</span></td>
+                        <td class="text-muted">@o.CreatedAt.ToString("dd.MM HH:mm")</td>
+                        <td>
+                            <button class="do-expand-btn" @onclick="() => ToggleExpand(o.Id)">
+                                <MudIcon Icon="@(expandedId == o.Id ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Style="font-size:18px; color:#94A3B8;" />
+                            </button>
+                        </td>
+                    </tr>
+                    @if (expandedId == o.Id)
+                    {
+                        <tr class="do-detail-row">
+                            <td colspan="9">
+                                <div class="do-detail-content">
+                                    <div class="do-detail-items">
+                                        @foreach (var item in o.Items)
+                                        {
+                                            <div class="do-detail-item">
+                                                <span class="do-dq">@item.Quantity×</span>
+                                                <span class="do-dn">@GetProductName(item.ProductId)</span>
+                                                <span class="do-dp">@((item.Quantity * item.UnitPrice).ToString("N2")) TL</span>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="do-detail-actions">
+                                        @if (o.Status == OrderStatus.Pending)
+                                        {
+                                            <button class="do-act-btn reject" @onclick="() => UpdateStatus(o.Id, OrderStatus.Cancelled)">İptal Et</button>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<style>
+    .do-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .do-title { margin: 0; font-size: 20px; font-weight: 600; color: #1E293B; }
+    .do-actions { display: flex; gap: 12px; align-items: center; }
+    .do-filters { display: flex; gap: 4px; background: #F1F5F9; border-radius: 8px; padding: 3px; }
+    .do-filter { padding: 6px 14px; border-radius: 6px; border: none; background: transparent; font-size: 13px; font-weight: 500; color: #64748B; cursor: pointer; }
+    .do-filter.active { background: white; color: #1E293B; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .do-refresh { width: 36px; height: 36px; border-radius: 8px; border: 1px solid #E2E8F0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    .do-table-card { background: white; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
+    .do-table { width: 100%; border-collapse: collapse; }
+    .do-table th { text-align: left; padding: 10px 16px; font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; background: #FAFBFC; }
+    .do-table td { padding: 12px 16px; font-size: 14px; color: #334155; border-top: 1px solid #F1F5F9; }
+    .do-table tr:hover td { background: #FAFBFC; }
+    .do-table tr.expanded td { background: #EFF6FF; }
+    .fw-600 { font-weight: 600; }
+    .text-muted { color: #94A3B8; }
+
+    .status-chip { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; }
+    .chip-active { background: #F0FFF4; color: #52C41A; }
+    .chip-pending { background: #FFF7E6; color: #FA8C16; }
+    .chip-completed { background: #EFF6FF; color: #1677FF; }
+    .chip-cancelled { background: #FFF1F0; color: #FF4D4F; }
+
+    .do-expand-btn { width: 30px; height: 30px; border-radius: 6px; border: 1px solid #E2E8F0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .do-detail-row td { padding: 0 !important; background: #F8FAFC !important; }
+    .do-detail-content { padding: 16px 24px; display: flex; justify-content: space-between; gap: 24px; }
+    .do-detail-items { flex: 1; }
+    .do-detail-item { display: flex; padding: 6px 0; font-size: 13px; }
+    .do-dq { width: 32px; color: #1677FF; font-weight: 600; }
+    .do-dn { flex: 1; color: #334155; }
+    .do-dp { color: #1E293B; font-weight: 600; }
+    .do-detail-actions { display: flex; gap: 8px; align-items: flex-start; }
+    .do-act-btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .do-act-btn.reject { background: #FFF1F0; color: #FF4D4F; }
+    .do-act-btn.approve { background: #F0FFF4; color: #52C41A; }
+</style>
+
+@code {
+    private List<OrderDto> orders = new();
+    private List<ProductDto> products = new();
+    private bool isLoading = true;
+    private string? filter;
+    private int? expandedId;
+
+    private IEnumerable<OrderDto> FilteredOrders => filter switch
+    {
+        "active" => orders.Where(o => o.Status == OrderStatus.Confirmed || o.Status == OrderStatus.Preparing || o.Status == OrderStatus.Ready),
+        "pending" => orders.Where(o => o.Status == OrderStatus.Pending),
+        "completed" => orders.Where(o => o.Status == OrderStatus.Paid || o.Status == OrderStatus.Cancelled),
+        _ => orders
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            orders = (await Http.GetFromJsonAsync<List<OrderDto>>("api/orders") ?? new()).OrderByDescending(o => o.CreatedAt).ToList();
+            products = await Http.GetFromJsonAsync<List<ProductDto>>("api/products") ?? new();
+        }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private string GetProductName(int id) => products.FirstOrDefault(p => p.Id == id)?.Name ?? $"Ürün #{id}";
+    private void ToggleExpand(int id) => expandedId = expandedId == id ? null : id;
+
+    private string GetChipClass(OrderStatus s) => s switch
+    {
+        OrderStatus.Pending => "chip-pending",
+        OrderStatus.Confirmed or OrderStatus.Preparing or OrderStatus.Ready => "chip-active",
+        OrderStatus.Paid => "chip-completed",
+        OrderStatus.Cancelled => "chip-cancelled",
+        _ => ""
+    };
+
+    private string GetStatusText(OrderStatus s) => s switch
+    {
+        OrderStatus.Pending => "Bekliyor",
+        OrderStatus.Confirmed => "Onaylandı",
+        OrderStatus.Preparing => "Hazırlanıyor",
+        OrderStatus.Ready => "Hazır",
+        OrderStatus.Paid => "Tamamlandı",
+        OrderStatus.Cancelled => "İptal",
+        _ => "—"
+    };
+
+    private async Task UpdateStatus(int orderId, OrderStatus status)
+    {
+        await Http.PutAsJsonAsync($"api/orders/{orderId}/status", (int)status);
+        await LoadData();
+        expandedId = null;
+    }
+}

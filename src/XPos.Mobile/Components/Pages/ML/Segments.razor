@@ -1,0 +1,118 @@
+@page "/ml/segments"
+
+@inject ISnackbar Snackbar
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div class="d-flex align-center gap-3">
+        <MudIcon Icon="@Icons.Material.Filled.Groups" Style="font-size:32px; color:#F59E0B;" />
+        <MudText Typo="Typo.h4" Style="font-weight:700;">Müşteri Segmentleri</MudText>
+        <MudChip T="string" Size="Size.Small" Style="background:#F59E0B; color:white;">K-Means</MudChip>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="LoadSegments" Disabled="@loading" Style="border-radius:10px; text-transform:none;">
+        @if (loading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+        Segmentleri Yükle
+    </MudButton>
+</div>
+
+<MudGrid>
+    @foreach (var seg in segments)
+    {
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-5" Elevation="1" Style="@($"border-radius:14px; border-top:4px solid {GetSegColor(seg.Name)};")">
+                <div class="d-flex align-center gap-2 mb-3">
+                    <MudIcon Icon="@GetSegIcon(seg.Name)" Style="@($"color:{GetSegColor(seg.Name)}; font-size:28px;")" />
+                    <MudText Typo="Typo.h6" Style="font-weight:700;">@seg.Name</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">@seg.Description</MudText>
+
+                <div class="d-flex flex-column gap-2">
+                    <div class="d-flex justify-space-between">
+                        <MudText Typo="Typo.body2">Müşteri Sayısı</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@seg.Count</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                        <MudText Typo="Typo.body2">Ort. Harcama</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@seg.AvgSpend.ToString("N2") TL</MudText>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                        <MudText Typo="Typo.body2">Ort. Sıklık</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@seg.AvgFrequency.ToString("N1") / ay</MudText>
+                    </div>
+                    @if (seg.AvgRecency > 0)
+                    {
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.body2">Ort. Son Ziyaret</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight:600;">@seg.AvgRecency.ToString("N0") gün önce</MudText>
+                        </div>
+                    }
+                </div>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+@if (!segments.Any() && !loading)
+{
+    <div class="d-flex flex-column align-center py-12">
+        <MudIcon Icon="@Icons.Material.Filled.PieChart" Style="font-size:64px; color:#CBD5E1;" />
+        <MudText Typo="Typo.h6" Class="mt-3" Color="Color.Secondary">Henüz segment verisi yok</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">RFM analizi ile müşteri segmentlerini oluşturun.</MudText>
+    </div>
+}
+
+@code {
+    private List<SegmentInfo> segments = new();
+    private bool loading;
+
+    protected override async Task OnInitializedAsync() => await LoadSegments();
+
+    private async Task LoadSegments()
+    {
+        loading = true;
+        try
+        {
+            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
+            var result = await client.GetFromJsonAsync<SegmentResponse>("/api/segments");
+            if (result?.Segments != null)
+                segments = result.Segments;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"ML servisine bağlanılamadı: {ex.Message}", Severity.Error);
+        }
+        loading = false;
+    }
+
+    private string GetSegColor(string? name) => name?.ToLower() switch
+    {
+        var n when n?.Contains("vip") == true || n?.Contains("premium") == true || n?.Contains("gurme") == true => "#F59E0B",
+        var n when n?.Contains("sadık") == true || n?.Contains("loyal") == true || n?.Contains("aile") == true || n?.Contains("sosyal") == true => "#10B981",
+        var n when n?.Contains("kayıp") == true || n?.Contains("churn") == true || n?.Contains("risk") == true => "#EF4444",
+        var n when n?.Contains("hızlı") == true || n?.Contains("öğle") == true => "#2196F3",
+        var n when n?.Contains("kahve") == true || n?.Contains("tatlı") == true => "#E91E63",
+        _ => "#6366F1"
+    };
+
+    private string GetSegIcon(string? name) => name?.ToLower() switch
+    {
+        var n when n?.Contains("vip") == true || n?.Contains("premium") == true || n?.Contains("gurme") == true => Icons.Material.Filled.Star,
+        var n when n?.Contains("sadık") == true || n?.Contains("loyal") == true || n?.Contains("aile") == true => Icons.Material.Filled.Favorite,
+        var n when n?.Contains("kayıp") == true || n?.Contains("risk") == true => Icons.Material.Filled.Warning,
+        var n when n?.Contains("hızlı") == true || n?.Contains("öğle") == true => Icons.Material.Filled.Speed,
+        var n when n?.Contains("kahve") == true || n?.Contains("tatlı") == true => Icons.Material.Filled.Coffee,
+        _ => Icons.Material.Filled.Person
+    };
+
+    private record SegmentResponse(List<SegmentInfo> Segments, int TotalOrders, int SegmentCount);
+    private record SegmentInfo(
+        int Id, string Name, string Color, string Icon, string Description,
+        int CustomerCount, double Percentage, decimal AvgSpend,
+        double AvgGroupSize, double AvgItems, decimal TotalRevenue,
+        double WeekendRatio, int PeakHour
+    )
+    {
+        public int Count => CustomerCount;
+        public decimal AvgFrequency => (decimal)AvgGroupSize;
+        public decimal AvgRecency => 0;
+    }
+}

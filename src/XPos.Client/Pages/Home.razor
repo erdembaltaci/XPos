@@ -1,0 +1,450 @@
+﻿@page "/"
+@using XPos.Client.Services
+@using XPos.Shared.DTOs
+@using XPos.Client.Components
+@inject HttpClient Http
+@inject CartService CartService
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<PageTitle>Lezzet Durağı | Dijital Menü</PageTitle>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <MudContainer Class="mt-8">
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="rounded-lg">@errorMessage</MudAlert>
+    </MudContainer>
+}
+else if (isLoading)
+{
+    <div class="loading-screen">
+        <div class="loading-pulse"></div>
+        <MudText Class="mt-6" Style="color: #667085; font-weight: 500;">Menü yükleniyor...</MudText>
+    </div>
+}
+else
+{
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="hero-content">
+            <div class="hero-badge">🍽️ QR Menü</div>
+            <h1 class="hero-title">Lezzet Durağı</h1>
+            <p class="hero-subtitle">Taze malzemeler, özenli hazırlık, unutulmaz lezzetler</p>
+        </div>
+        <div class="hero-overlay"></div>
+    </div>
+
+    <!-- Campaign Banner -->
+    @if (activeCampaignBanner != null)
+    {
+        <div class="campaign-banner">
+            <div class="campaign-badge">🎯 KAMPANYA</div>
+            <div class="campaign-text">
+                <span class="campaign-title">@activeCampaignBanner.Title</span>
+                <span class="campaign-desc">@activeCampaignBanner.Description</span>
+            </div>
+            @if (activeCampaignBanner.DiscountPercent > 0)
+            {
+                <div class="campaign-discount">%@activeCampaignBanner.DiscountPercent</div>
+            }
+        </div>
+    }
+
+    <!-- Category Pills -->
+    <div class="category-strip">
+        <div class="category-scroll">
+            <button type="button" class="cat-pill @(activeCategoryId == 0 ? "active" : "")" @onclick="() => ShowAll()">
+                <span class="cat-emoji">🔥</span>
+                <span>Tümü</span>
+            </button>
+            @foreach (var cat in categories)
+            {
+                <button type="button" class="cat-pill @(activeCategoryId == cat.Id ? "active" : "")"
+                        @onclick="() => ScrollToCategory(cat.Id)">
+                    <span class="cat-emoji">@GetCategoryEmoji(cat.Name)</span>
+                    <span>@cat.Name</span>
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Sticky AI Banner -->
+    <div class="ai-sticky-bar">
+        <button type="button" class="ai-sticky-btn" @onclick="() => showAiWizard = true">
+            <span class="ai-sparkle">✨</span>
+            <span class="ai-btn-text">Yapay Zeka Öneri</span>
+            <span class="ai-btn-desc">Ne yesem?</span>
+        </button>
+    </div>
+
+    <!-- Products -->
+    <div class="menu-content">
+        @foreach (var cat in categories)
+        {
+            var catProducts = products.Where(p => p.CategoryId == cat.Id).ToList();
+            if (catProducts.Any())
+            {
+                <div id="cat-@cat.Id" class="menu-section">
+                    <div class="section-header">
+                        <span class="section-emoji">@GetCategoryEmoji(cat.Name)</span>
+                        <h2 class="section-title">@cat.Name</h2>
+                        <span class="section-count">@catProducts.Count ürün</span>
+                    </div>
+
+                    <div class="product-grid">
+                        @foreach (var product in catProducts)
+                        {
+                            <div class="product-card" @onclick="() => OpenProductDetail(product)">
+                                <div class="card-image-wrapper">
+                                    @if (!string.IsNullOrEmpty(product.ImageUrl))
+                                    {
+                                        <img src="@product.ImageUrl" class="card-image" alt="@product.Name" loading="lazy" />
+                                    }
+                                    else
+                                    {
+                                        <div class="card-image-placeholder">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Restaurant" Style="font-size: 40px;" />
+                                        </div>
+                                    }
+                                    <div class="card-image-overlay"></div>
+                                    <div class="card-price-badge">₺@product.Price.ToString("N0")</div>
+                                </div>
+                                <div class="card-body">
+                                    <h3 class="card-title">@product.Name</h3>
+                                    <p class="card-desc">@product.Description</p>
+                                    <button class="card-add-btn" @onclick:stopPropagation="true" @onclick="() => QuickAdd(product)">
+                                        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />
+                                        <span>Ekle</span>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+}
+
+<AiRecommendationWizard @bind-IsOpen="showAiWizard" AllProducts="products" AllCategories="categories" />
+
+<style>
+    /* ── Loading ── */
+    .loading-screen {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        min-height: 60vh;
+    }
+    .loading-pulse {
+        width: 48px; height: 48px; border-radius: 50%;
+        background: linear-gradient(135deg, #FF5500, #FF8C42);
+        animation: pulse 1.2s ease-in-out infinite;
+    }
+    @@keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.5; } }
+
+    /* ── Hero Section ── */
+    .hero-section {
+        position: relative; margin: -24px -16px 0 -16px; padding: 64px 24px 50px;
+        background: radial-gradient(circle at top right, #1e293b, #0f172a);
+        overflow: hidden;
+    }
+    .hero-section::before {
+        content: ''; position: absolute; top: -10%; right: -10%; width: 300px; height: 300px;
+        background: radial-gradient(circle, rgba(234, 88, 12, 0.2) 0%, transparent 70%);
+        filter: blur(40px);
+    }
+    .hero-content { position: relative; z-index: 2; text-align: center; }
+    .hero-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.05); backdrop-filter: blur(10px);
+        color: #F8FAFC; padding: 6px 14px; border-radius: 50px;
+        font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.05em; border: 1px solid rgba(255,255,255,0.1);
+        margin-bottom: 16px;
+    }
+    .hero-title {
+        font-family: 'Outfit', sans-serif; font-size: 2.8rem; font-weight: 900;
+        color: white; margin: 0; letter-spacing: -1.5px;
+        background: linear-gradient(to bottom, #FFFFFF, #CBD5E1);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero-subtitle {
+        color: #94A3B8; font-size: 1rem; font-weight: 500;
+        max-width: 340px; margin: 12px auto 0; line-height: 1.6;
+    }
+
+    /* ── Campaign Banner ── */
+    .campaign-banner {
+        display: flex; align-items: center; gap: 12px;
+        margin: 0 -16px; padding: 14px 20px;
+        background: linear-gradient(135deg, #FF5500, #FF8C42);
+        color: white; overflow: hidden;
+    }
+    .campaign-badge {
+        font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
+        background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 6px;
+        white-space: nowrap; letter-spacing: 0.5px;
+    }
+    .campaign-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .campaign-title { font-weight: 800; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .campaign-desc { font-size: 0.75rem; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .campaign-discount {
+        font-size: 1.4rem; font-weight: 900; background: white; color: #FF5500;
+        padding: 6px 14px; border-radius: 12px; white-space: nowrap;
+    }
+
+    /* ── Category Strip ── */
+    .category-strip {
+        position: sticky; top: 0; z-index: 100;
+        background: rgba(255,255,255,0.8); backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(0,0,0,0.05); padding: 14px 0;
+    }
+    .category-scroll {
+        display: flex; gap: 10px; overflow-x: auto; padding: 0 16px;
+        scrollbar-width: none;
+    }
+    .category-scroll::-webkit-scrollbar { display: none; }
+    .cat-pill {
+        display: flex; align-items: center; gap: 8px; white-space: nowrap;
+        padding: 10px 18px; border-radius: 16px; border: 1px solid #F1F5F9;
+        background: #F8FAFC; color: #64748B; font-weight: 700; font-size: 0.88rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .cat-pill:hover { border-color: #EA580C; color: #EA580C; background: white; }
+    .cat-pill.active {
+        background: #0F172A; color: white; border-color: #0F172A;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .cat-emoji { font-size: 1.2rem; }
+
+    /* ── Menu Content ── */
+    .menu-content { padding: 12px 16px 120px 16px; background: #FAFAFA; }
+    .menu-section { margin-bottom: 40px; scroll-margin-top: 100px; }
+    .section-header {
+        display: flex; align-items: baseline; gap: 10px;
+        margin-bottom: 20px;
+    }
+    .section-title {
+        font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800;
+        color: #0F172A; margin: 0; letter-spacing: -0.5px;
+    }
+    .section-count { font-size: 0.85rem; font-weight: 600; color: #94A3B8; }
+
+    /* ── Product Card Premium ── */
+    .product-grid {
+        display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+    }
+    .product-card {
+        background: white; border-radius: 24px; overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.04);
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .product-card:hover { 
+        transform: translateY(-6px); 
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+    }
+
+    .card-image-wrapper { 
+        position: relative; width: 100%; aspect-ratio: 1; overflow: hidden;
+        background: #F1F5F9;
+    }
+    .card-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s; }
+    .product-card:hover .card-image { transform: scale(1.1); }
+    
+    .card-price-badge {
+        position: absolute; bottom: 12px; left: 12px;
+        background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px);
+        color: white; padding: 6px 12px; border-radius: 12px;
+        font-weight: 800; font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .card-body { padding: 16px; }
+    .card-title { font-size: 1rem; font-weight: 800; color: #0F172A; margin: 0 0 6px; line-height: 1.3; }
+    .card-desc { font-size: 0.8rem; color: #64748B; margin-bottom: 16px; line-height: 1.5; height: 2.4em; overflow: hidden; }
+    
+    .card-add-btn {
+        width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+        padding: 10px; border-radius: 14px; border: none;
+        background: #F1F5F9; color: #0F172A; font-weight: 700; font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+    .product-card:hover .card-add-btn { background: #0F172A; color: white; }
+    .card-add-btn:active { transform: scale(0.95); }
+
+    /* ── AI Sticky Bar ── */
+    .ai-sticky-bar { 
+        position: fixed; bottom: 24px; left: 0; right: 0; z-index: 999;
+        display: flex; justify-content: center; pointer-events: none;
+    }
+    .ai-sticky-btn {
+        pointer-events: auto;
+        display: flex; align-items: center; gap: 10px;
+        padding: 14px 28px; border-radius: 100px; border: none;
+        background: linear-gradient(135deg, #6366F1, #8B5CF6);
+        color: white; font-weight: 800; font-size: 1rem; cursor: pointer;
+        box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .ai-sticky-btn:hover { transform: translateY(-4px) scale(1.05); box-shadow: 0 15px 35px rgba(99, 102, 241, 0.5); }
+    .ai-sticky-btn:active { transform: scale(0.95); }
+    
+    @@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .ai-sparkle { font-size: 1rem; }
+    .ai-btn-text { font-weight: 800; }
+    .ai-btn-desc { opacity: 0.8; font-weight: 500; font-size: 0.8rem; }
+    @@keyframes aiGlow {
+        0%, 100% { box-shadow: 0 6px 20px rgba(139,92,246,0.35); }
+        50% { box-shadow: 0 6px 28px rgba(139,92,246,0.55); }
+    }
+
+    /* ── Responsive ── */
+    @@media (max-width: 480px) {
+        .product-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .hero-title { font-size: 1.8rem; }
+        .hero-section { padding: 36px 20px 32px; }
+    }
+    @@media (min-width: 768px) {
+        .product-grid { grid-template-columns: repeat(3, 1fr); }
+        .hero-title { font-size: 2.8rem; }
+    }
+    @@media (min-width: 1024px) {
+        .product-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+</style>
+
+@code {
+    private List<ProductDto> products = new();
+    private List<CategoryDto> categories = new();
+    private int activeCategoryId = 0;
+    private bool showAiWizard = false;
+    private CampaignInfo? activeCampaignBanner;
+
+    private string errorMessage = string.Empty;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateTableNumber();
+        CartService.OnChange += StateHasChanged;
+
+        try
+        {
+            var categoriesTask = Http.GetFromJsonAsync<List<CategoryDto>>("api/categories");
+            var productsTask = Http.GetFromJsonAsync<List<ProductDto>>("api/products");
+
+            await Task.WhenAll(categoriesTask, productsTask);
+
+            categories = await categoriesTask ?? new();
+            products = await productsTask ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Menü yüklenirken bir sorun oluştu. Lütfen sayfayı yenileyin.";
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+
+        // Load active campaign
+        try
+        {
+            var cResult = await Http.GetFromJsonAsync<ActiveCampaignResponse>("api/ml/campaigns/active");
+            if (cResult?.Active == true && cResult.Campaign != null)
+                activeCampaignBanner = cResult.Campaign;
+        }
+        catch { /* ML down — no banner */ }
+    }
+
+    private record ActiveCampaignResponse(bool Active, CampaignInfo? Campaign);
+    private record CampaignInfo(string Id, string Title, string Description, int DiscountPercent, List<string> TargetCategories, string Condition, int Priority, string Color);
+
+    [SupplyParameterFromQuery(Name = "table")]
+    public string? TableNumberQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "token")]
+    public Guid? TableTokenQuery { get; set; }
+
+    private async Task UpdateTableNumber()
+    {
+        if (TableTokenQuery.HasValue)
+        {
+            try 
+            {
+                var tableDto = await Http.GetFromJsonAsync<TableDto>($"api/tables/by-token/{TableTokenQuery}");
+                if (tableDto != null)
+                {
+                    CartService.TableNumber = tableDto.TableNumber;
+                    // Securely save to localStorage
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "verified_table", tableDto.TableNumber);
+                }
+            }
+            catch 
+            {
+                // Token geçersiz veya hata
+                Console.WriteLine("Token validasyonu başarısız");
+            }
+        }
+        else if (string.IsNullOrEmpty(CartService.TableNumber) && !string.IsNullOrEmpty(TableNumberQuery))
+        {
+            // Legacy/Dev support — avoid "Masa Masa X" duplication
+            CartService.TableNumber = TableNumberQuery.StartsWith("Masa", StringComparison.OrdinalIgnoreCase)
+                ? TableNumberQuery
+                : $"Masa {TableNumberQuery}";
+        }
+    }
+
+    private void ShowAll()
+    {
+        activeCategoryId = 0;
+    }
+
+    private async Task ScrollToCategory(int categoryId)
+    {
+        activeCategoryId = categoryId;
+        await JSRuntime.InvokeVoidAsync("scrollToElement", "cat-" + categoryId);
+    }
+
+    private void QuickAdd(ProductDto product)
+    {
+        CartService.AddToCart(product);
+    }
+
+    private async Task OpenProductDetail(ProductDto product)
+    {
+        var parameters = new DialogParameters { ["Product"] = product };
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = false,
+            NoHeader = true,
+            BackdropClick = true
+        };
+        await DialogService.ShowAsync<ProductDetailDialog>("", parameters, options);
+    }
+
+    private string GetCategoryEmoji(string name) => name switch
+    {
+        "Başlangıçlar" => "🥗",
+        "Salatalar" => "🥬",
+        "Burgerler" => "🍔",
+        "Pizzalar" => "🍕",
+        "Ana Yemekler" => "🥩",
+        "Makarnalar" => "🍝",
+        "İçecekler" => "🥤",
+        "Tatlılar" => "🍰",
+        "Kahvaltı" => "☕",
+        _ => "🍽️"
+    };
+
+    public void Dispose()
+    {
+        CartService.OnChange -= StateHasChanged;
+    }
+}

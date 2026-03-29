@@ -1,0 +1,679 @@
+@page "/cart"
+@using XPos.Client.Services
+@using XPos.Shared.DTOs
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@using System.Net.Http.Json
+
+@inject CartService CartService
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Sepetim | Lezzet Durağı</PageTitle>
+
+<div class="cart-page">
+    <!-- Header -->
+    <div class="cart-header">
+        <a href="/" class="cart-back-btn">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowBackIos" Size="Size.Small" />
+        </a>
+        <h1 class="cart-page-title">Sepetim</h1>
+        @if (CartService.Items.Any())
+        {
+            <span class="cart-item-count">@CartService.Items.Sum(i => i.Quantity) ürün</span>
+        }
+    </div>
+
+    @if (!CartService.Items.Any())
+    {
+        <div class="cart-empty">
+            <div class="cart-empty-icon">🛒</div>
+            <h2 class="cart-empty-title">Sepetiniz Boş</h2>
+            <p class="cart-empty-desc">Lezzetli yemeklerimizden sepetinize ekleyin!</p>
+            <a href="/" class="cart-browse-btn">
+                <MudIcon Icon="@Icons.Material.Filled.RestaurantMenu" Size="Size.Small" />
+                <span>Menüye Dön</span>
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="cart-content">
+            <!-- Cart Items -->
+            <div class="cart-items-section">
+                @foreach (var item in CartService.Items)
+                {
+                    <div class="cart-item">
+                        <div class="cart-item-img-wrapper">
+                            @if (!string.IsNullOrEmpty(item.Product.ImageUrl))
+                            {
+                                <img src="@item.Product.ImageUrl" class="cart-item-img" alt="@item.Product.Name" />
+                            }
+                            else
+                            {
+                                <div class="cart-item-img-placeholder">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Restaurant" />
+                                </div>
+                            }
+                        </div>
+                        <div class="cart-item-details">
+                            <div class="cart-item-top">
+                                <h3 class="cart-item-name">@item.Product.Name</h3>
+                                <button class="cart-item-remove" @onclick="@(() => CartService.RemoveFromCart(item.Product))">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                                </button>
+                            </div>
+                            <span class="cart-item-unit-price">₺@item.Product.Price.ToString("N0")</span>
+
+                            <MudTextField @bind-Value="item.Note" Placeholder="Not ekle (örn: acısız)"
+                                          Variant="Variant.Text" Margin="Margin.Dense" Class="cart-note-input"
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.EditNote" />
+
+                            <div class="cart-item-bottom">
+                                <div class="cart-qty-controls">
+                                    <button class="cart-qty-btn" @onclick="@(() => CartService.DecreaseQuantity(item.Product))">
+                                        <MudIcon Icon="@Icons.Material.Filled.Remove" Size="Size.Small" />
+                                    </button>
+                                    <span class="cart-qty-value">@item.Quantity</span>
+                                    <button class="cart-qty-btn cart-qty-plus" @onclick="@(() => CartService.IncreaseQuantity(item.Product))">
+                                        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />
+                                    </button>
+                                </div>
+                                <span class="cart-item-total">₺@((item.Product.Price * item.Quantity).ToString("N0"))</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- AI Recommendations -->
+            @if (aiRecommendations.Any())
+            {
+                <div class="ai-reco-section">
+                    <div class="ai-reco-header">
+                        <span class="ai-reco-icon">🍽️</span>
+                        <div>
+                            <h3 class="ai-reco-title">Yanına da ekle!</h3>
+                            <p class="ai-reco-subtitle">Sepetindekilerle harika gider 🤖</p>
+                        </div>
+                    </div>
+                    <div class="ai-reco-grid">
+                        @foreach (var reco in aiRecommendations)
+                        {
+                            <div class="ai-reco-card" @onclick="() => AddRecommendation(reco)">
+                                <div class="ai-reco-card-icon">
+                                    @(GetCategoryEmoji(reco.Name))
+                                </div>
+                                <span class="ai-reco-card-name">@reco.Name</span>
+                                @if (reco.Price > 0)
+                                {
+                                    <span class="ai-reco-card-price">+₺@reco.Price.ToString("N0")</span>
+                                }
+                                <span class="ai-reco-card-conf">%@((int)(reco.Confidence * 100)) tercih</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            @if (isLoadingReco)
+            {
+                <div style="text-align:center; padding:16px;">
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+                    <span style="font-size:0.8rem; color:#9CA3AF; margin-left:8px;">AI öneriler yükleniyor...</span>
+                </div>
+            }
+
+            <!-- Order Summary (Sticky) -->
+            <div class="cart-summary-card">
+                <h3 class="cart-summary-title">Sipariş Özeti</h3>
+
+                <div class="cart-summary-row">
+                    <span>Ara Toplam</span>
+                    <span class="cart-summary-value">₺@CartService.TotalPrice.ToString("N0")</span>
+                </div>
+                @if (campaignDiscount > 0 && activeCampaign != null)
+                {
+                    <div class="cart-summary-row" style="color:#4CAF50;">
+                        <span>🎯 @activeCampaign.Title</span>
+                        <span style="font-weight:700;">-₺@campaignDiscount.ToString("N0")</span>
+                    </div>
+                }
+                <div class="cart-summary-row">
+                    <span>Hizmet Bedeli</span>
+                    <span class="cart-summary-free">Ücretsiz</span>
+                </div>
+                <div class="cart-summary-divider"></div>
+                <div class="cart-summary-row cart-summary-total">
+                    <span>Toplam</span>
+                    <span>₺@((CartService.TotalPrice - campaignDiscount).ToString("N0"))</span>
+                </div>
+
+                @if (activeCampaign != null && activeCampaign.DiscountPercent > 0)
+                {
+                    <div style="background:linear-gradient(135deg,#FFF3E0,#FFF8E1); border:1px solid #FFB74D; border-radius:10px; padding:10px 14px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:1.2rem;">🎉</span>
+                        <span style="font-size:0.8rem; color:#E65100; font-weight:600;">@activeCampaign.Description</span>
+                    </div>
+                }
+
+                <MudTextField @bind-Value="TableNumber" 
+                               Label="@(isTableLoading ? "Masa Belirleniyor..." : "Masa Numarası")" 
+                               Variant="Variant.Outlined"
+                               ReadOnly="@isTableReadOnly" Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.TableRestaurant"
+                               Class="cart-table-input"
+                               Disabled="isTableLoading" />
+
+                <button class="cart-submit-btn" @onclick="SubmitOrder" disabled="@(isSubmitting || isTableLoading)">
+                    @if (isSubmitting)
+                    {
+                        <div class="cart-submit-spinner"></div>
+                        <span>Gönderiliyor...</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Send" Size="Size.Small" />
+                        <span>Siparişi Onayla</span>
+                        <span class="cart-submit-price">₺@((CartService.TotalPrice - campaignDiscount).ToString("N0"))</span>
+                    }
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .cart-page { padding: 0 0 120px 0; max-width: 680px; margin: 0 auto; }
+
+    /* Header */
+    .cart-header {
+        display: flex; align-items: center; gap: 12px;
+        padding: 16px 16px 8px; position: sticky; top: 56px; z-index: 50;
+        background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+    }
+    .cart-back-btn {
+        width: 36px; height: 36px; border-radius: 10px; border: 1.5px solid #E5E7EB;
+        display: flex; align-items: center; justify-content: center;
+        color: #374151; text-decoration: none; transition: all 0.2s;
+    }
+    .cart-back-btn:hover { border-color: #FF5500; color: #FF5500; }
+    .cart-page-title {
+        font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800;
+        color: #111827; flex: 1; margin: 0;
+    }
+    .cart-item-count {
+        font-size: 0.8rem; font-weight: 600; color: #FF5500;
+        background: rgba(255,85,0,0.1); padding: 4px 12px; border-radius: 12px;
+    }
+
+    /* Empty State */
+    .cart-empty {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 80px 20px; text-align: center;
+    }
+    .cart-empty-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.4; }
+    .cart-empty-title { font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 700; color: #111827; margin: 0 0 8px; }
+    .cart-empty-desc { color: #6B7280; font-size: 0.9rem; margin: 0 0 24px; }
+    .cart-browse-btn {
+        display: flex; align-items: center; gap: 8px; padding: 12px 24px;
+        background: linear-gradient(135deg, #FF5500, #FF7A33); color: white;
+        border-radius: 12px; font-weight: 700; text-decoration: none;
+        box-shadow: 0 4px 14px rgba(255,85,0,0.3); transition: all 0.2s;
+    }
+    .cart-browse-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,85,0,0.4); }
+
+    /* Cart Content */
+    .cart-content { padding: 0 16px; }
+
+    /* Cart Item */
+    .cart-item {
+        display: flex; gap: 14px; background: white; border-radius: 16px;
+        padding: 14px; margin-bottom: 12px;
+        border: 1px solid #F3F4F6; transition: all 0.2s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .cart-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+    .cart-item-img-wrapper {
+        width: 80px; height: 80px; border-radius: 12px; overflow: hidden; flex-shrink: 0;
+    }
+    .cart-item-img { width: 100%; height: 100%; object-fit: cover; }
+    .cart-item-img-placeholder {
+        width: 100%; height: 100%; background: #F3F4F6;
+        display: flex; align-items: center; justify-content: center; color: #9CA3AF;
+    }
+
+    .cart-item-details { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .cart-item-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .cart-item-name { font-size: 0.95rem; font-weight: 700; color: #111827; margin: 0; line-height: 1.2; }
+    .cart-item-remove {
+        width: 28px; height: 28px; border-radius: 8px; border: none;
+        background: #FEF2F2; color: #EF4444; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s; flex-shrink: 0;
+    }
+    .cart-item-remove:hover { background: #FEE2E2; }
+    .cart-item-unit-price { font-size: 0.8rem; color: #9CA3AF; margin-top: 2px; }
+
+    .cart-note-input { margin-top: 4px !important; font-size: 0.8rem; }
+
+    .cart-item-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+
+    .cart-qty-controls {
+        display: flex; align-items: center; gap: 8px;
+        background: #F9FAFB; border-radius: 10px; padding: 2px;
+    }
+    .cart-qty-btn {
+        width: 30px; height: 30px; border-radius: 8px; border: none;
+        background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        color: #374151; transition: all 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+    .cart-qty-btn:hover { background: #F3F4F6; }
+    .cart-qty-plus { background: #FF5500; color: white; }
+    .cart-qty-plus:hover { background: #E64D00; }
+    .cart-qty-value { font-weight: 800; font-size: 0.95rem; color: #111827; min-width: 24px; text-align: center; }
+    .cart-item-total { font-weight: 800; font-size: 1.05rem; color: #FF5500; }
+
+    /* Summary Card */
+    .cart-summary-card {
+        background: white; border-radius: 20px; padding: 20px;
+        margin-top: 16px; border: 1px solid #F3F4F6;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    .cart-summary-title {
+        font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700;
+        color: #111827; margin: 0 0 16px;
+    }
+    .cart-summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem; color: #6B7280; }
+    .cart-summary-value { font-weight: 600; color: #374151; }
+    .cart-summary-free { font-weight: 600; color: #10B981; }
+    .cart-summary-divider { height: 1px; background: #F3F4F6; margin: 12px 0; }
+    .cart-summary-total { font-size: 1.15rem; font-weight: 800; color: #111827; }
+
+    .cart-table-input { margin: 16px 0 !important; }
+
+    /* Submit Button */
+    .cart-submit-btn {
+        width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+        padding: 14px; border-radius: 14px; border: none;
+        background: linear-gradient(135deg, #FF5500, #FF7A33);
+        color: white; font-weight: 700; font-size: 1rem; cursor: pointer;
+        box-shadow: 0 6px 20px rgba(255,85,0,0.35);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .cart-submit-btn:hover { box-shadow: 0 8px 28px rgba(255,85,0,0.45); transform: translateY(-2px); }
+    .cart-submit-btn:active { transform: scale(0.97); }
+    .cart-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .cart-submit-price {
+        background: rgba(255,255,255,0.2); padding: 4px 12px;
+        border-radius: 8px; font-weight: 800; margin-left: 4px;
+    }
+    .cart-submit-spinner {
+        width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white; border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+
+    /* AI Recommendation Section */
+    .ai-reco-section {
+        background: linear-gradient(135deg, #FFF7ED, #FEF3C7);
+        border: 1.5px solid #FBBF24;
+        border-radius: 16px;
+        padding: 16px;
+        margin-top: 16px;
+    }
+    .ai-reco-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+    .ai-reco-icon {
+        font-size: 28px;
+    }
+    .ai-reco-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #92400E;
+        margin: 0;
+    }
+    .ai-reco-subtitle {
+        font-size: 0.75rem;
+        color: #B45309;
+        margin: 0;
+    }
+    .ai-reco-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    .ai-reco-card {
+        background: white;
+        border: 1.5px solid #FDE68A;
+        border-radius: 12px;
+        padding: 10px 6px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+    }
+    .ai-reco-card:hover {
+        border-color: #F59E0B;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+        transform: translateY(-2px);
+    }
+    .ai-reco-card:active {
+        transform: scale(0.95);
+    }
+    .ai-reco-card-icon {
+        font-size: 22px;
+    }
+    .ai-reco-card-name {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #1F2937;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+    .ai-reco-card-price {
+        font-size: 0.75rem;
+        font-weight: 800;
+        color: #FF5500;
+    }
+    .ai-reco-card-conf {
+        font-size: 0.6rem;
+        font-weight: 600;
+        color: white;
+        background: #22C55E;
+        padding: 1px 8px;
+        border-radius: 8px;
+    }
+</style>
+
+@code {
+    private string TableNumber { get; set; } = "";
+    private bool isTableLoading = true;
+    private bool isSubmitting = false;
+    private bool isTableReadOnly = false;
+
+    // AI Recommendations
+    private List<RecoItem> aiRecommendations = new();
+    private bool isLoadingReco = false;
+    private List<ProductDto> allProducts = new();
+    private bool _skipRecoRefresh = false;
+
+    // Campaign
+    private CampaignInfo? activeCampaign;
+    private List<CategoryDto> categories = new();
+    private decimal campaignDiscount => CalculateDiscount();
+
+    private record RecoItem(int ProductId, string Name, decimal Price, double Confidence);
+    private record ActiveCampaignResponse(bool Active, CampaignInfo? Campaign);
+    private record CampaignInfo(string Id, string Title, string Description, decimal DiscountPercent, List<string> TargetCategories);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // LocalStorage check for security
+        try 
+        {
+            var storedTable = await JS.InvokeAsync<string>("localStorage.getItem", "verified_table");
+            if (!string.IsNullOrEmpty(storedTable))
+            {
+                TableNumber = storedTable;
+                isTableReadOnly = true;
+            }
+        }
+        catch { /* Ignored */ }
+
+        if (!isTableReadOnly)
+        {
+            if (!string.IsNullOrEmpty(CartService.TableNumber))
+            {
+                TableNumber = CartService.TableNumber;
+                isTableReadOnly = true;
+            }
+            else
+            {
+                var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+                var query = uri.Query.TrimStart('?');
+                var table = query.Split('&')
+                                .Select(q => q.Split('='))
+                                .FirstOrDefault(q => q.Length == 2 && q[0] == "table")?
+                                .ElementAtOrDefault(1);
+
+                if (!string.IsNullOrEmpty(table))
+                {
+                    // Avoid "Masa Masa X" duplication
+                    TableNumber = table.StartsWith("Masa", StringComparison.OrdinalIgnoreCase)
+                        ? table
+                        : $"Masa {table}";
+                }
+            }
+        }
+
+        isTableLoading = false;
+        CartService.TableNumber = TableNumber;
+        CartService.OnChange += OnCartChanged;
+
+        // Load products for price lookup
+        try { allProducts = await Http.GetFromJsonAsync<List<ProductDto>>("api/products") ?? new(); }
+        catch { }
+
+        // Load categories for campaign matching
+        try { categories = await Http.GetFromJsonAsync<List<CategoryDto>>("api/categories") ?? new(); }
+        catch { }
+
+        // Load active campaign
+        try
+        {
+            var campResp = await Http.GetFromJsonAsync<ActiveCampaignResponse>("api/ml/campaigns/active");
+            activeCampaign = campResp is { Active: true, Campaign: not null } ? campResp.Campaign : null;
+        }
+        catch { activeCampaign = null; }
+
+        // Fetch AI recommendations
+        await FetchRecommendations();
+    }
+
+    private async void OnCartChanged()
+    {
+        if (_skipRecoRefresh)
+        {
+            // Just update UI without re-fetching recommendations
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task FetchRecommendations()
+    {
+        if (!CartService.Items.Any()) { aiRecommendations = new(); StateHasChanged(); return; }
+        if (isLoadingReco) return;
+        
+        isLoadingReco = true;
+        StateHasChanged();
+
+        try
+        {
+            var productNames = CartService.Items.Select(i => i.Product.Name).ToList();
+            var payload = new { Products = productNames, Limit = 6 };
+
+            var response = await Http.PostAsJsonAsync("api/ml/recommendations/basket", payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<SmartRecoResponse>();
+
+                if (result?.Recommendations != null)
+                {
+                    var cartIds = CartService.Items.Select(i => i.Product.Id).ToHashSet();
+                    aiRecommendations = result.Recommendations
+                        .Where(r => !cartIds.Contains(r.ProductId))
+                        .Select(r => new RecoItem(r.ProductId, r.Name, (decimal)r.Price, r.Confidence))
+                        .ToList();
+                }
+                else
+                {
+                    aiRecommendations = new();
+                }
+            }
+            else
+            {
+                aiRecommendations = new();
+            }
+        }
+        catch { aiRecommendations = new(); }
+        finally { isLoadingReco = false; StateHasChanged(); }
+    }
+
+    private void AddRecommendation(RecoItem reco)
+    {
+        // Match by product ID (guaranteed accurate)
+        var product = allProducts.FirstOrDefault(p => p.Id == reco.ProductId);
+        if (product == null)
+        {
+            // Fallback: fuzzy name match
+            product = allProducts.FirstOrDefault(p =>
+                p.Name.Equals(reco.Name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (product != null)
+        {
+            _skipRecoRefresh = true;
+            CartService.AddToCart(product);
+            _skipRecoRefresh = false;
+            // Remove from displayed list immediately
+            aiRecommendations = aiRecommendations.Where(r => r.ProductId != reco.ProductId).ToList();
+            StateHasChanged();
+        }
+    }
+
+    private string GetCategoryEmoji(string name)
+    {
+        var n = name.ToLower();
+        if (n.Contains("kola") || n.Contains("fanta") || n.Contains("sprite")) return "🥤";
+        if (n.Contains("ayran") || n.Contains("su") || n.Contains("çay")) return "🥛";
+        if (n.Contains("kahve") || n.Contains("latte") || n.Contains("espresso")) return "☕";
+        if (n.Contains("patates") || n.Contains("kızartma")) return "🍟";
+        if (n.Contains("hamburger") || n.Contains("burger")) return "🍔";
+        if (n.Contains("pizza")) return "🍕";
+        if (n.Contains("lahmacun") || n.Contains("pide")) return "🫓";
+        if (n.Contains("salata")) return "🥗";
+        if (n.Contains("çorba") || n.Contains("soup")) return "🍲";
+        if (n.Contains("tatlı") || n.Contains("baklava") || n.Contains("künefe")) return "🍰";
+        if (n.Contains("dondurma")) return "🍦";
+        if (n.Contains("soğan") || n.Contains("halka")) return "🧅";
+        return "🍽️";
+    }
+
+    private async Task SubmitOrder()
+    {
+        if (string.IsNullOrWhiteSpace(TableNumber))
+        {
+            await JS.InvokeVoidAsync("alert", "Lütfen masa numaranızı giriniz.");
+            return;
+        }
+
+        // Add confirmation for table number if it was entered manually
+        if (!isTableReadOnly)
+        {
+            var confirmed = await JS.InvokeAsync<bool>("confirm", $"{TableNumber} için siparişinizi onaylıyor musunuz? (Lütfen masa numarasını kontrol ediniz)");
+            if (!confirmed) return;
+        }
+
+        isSubmitting = true;
+        bool success = false;
+        try
+        {
+            // Build order with campaign discounts applied
+            var orderDto = new CreateOrderDto
+            {
+                TableNumber = TableNumber,
+                Items = CartService.Items.Select(item =>
+                {
+                    var unitPrice = item.Product.Price;
+                    var note = item.Note ?? "";
+
+                    if (activeCampaign != null && activeCampaign.DiscountPercent > 0)
+                    {
+                        var cat = categories.FirstOrDefault(c => c.Id == item.Product.CategoryId);
+                        if (cat != null && CampaignMatchesCategory(cat.Name))
+                        {
+                            var discount = unitPrice * activeCampaign.DiscountPercent / 100m;
+                            unitPrice -= discount;
+                            note = $"[Kampanya %{activeCampaign.DiscountPercent}] {note}".Trim();
+                        }
+                    }
+
+                    return new CreateOrderItemDto
+                    {
+                        ProductId = item.Product.Id,
+                        Quantity = item.Quantity,
+                        UnitPrice = unitPrice,
+                        Note = note
+                    };
+                }).ToList()
+            };
+
+            var response = await Http.PostAsJsonAsync("api/orders", orderDto);
+            success = response.IsSuccessStatusCode;
+            if (success) CartService.Clear();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Sipariş gönderilirken hata oluştu: {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+
+        if (success)
+        {
+            await JS.InvokeVoidAsync("alert", "Siparişiniz Mutfak Ekranına Düştü! 👨‍🍳\nGarson onayladığında hazırlanmaya başlayacak.");
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    public void Dispose()
+    {
+        CartService.OnChange -= OnCartChanged;
+    }
+
+    private decimal CalculateDiscount()
+    {
+        if (activeCampaign == null || activeCampaign.DiscountPercent <= 0) return 0m;
+
+        decimal total = 0m;
+        foreach (var item in CartService.Items)
+        {
+            var cat = categories.FirstOrDefault(c => c.Id == item.Product.CategoryId);
+            if (cat != null && CampaignMatchesCategory(cat.Name))
+            {
+                total += item.Product.Price * item.Quantity * activeCampaign.DiscountPercent / 100m;
+            }
+        }
+        return total;
+    }
+
+    private bool CampaignMatchesCategory(string categoryName)
+    {
+        if (activeCampaign?.TargetCategories == null) return false;
+        var name = categoryName.ToLowerInvariant();
+        return activeCampaign.TargetCategories.Any(t => name.Contains(t.ToLowerInvariant()));
+    }
+
+    // DTO for ML smart response
+    private record SmartRecoResponse(List<SmartRecoItem> Recommendations, int Count);
+    private record SmartRecoItem(int ProductId, string Name, double Price, int CategoryId, double Confidence, string Reason);
+}

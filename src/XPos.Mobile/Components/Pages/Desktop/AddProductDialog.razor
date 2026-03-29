@@ -1,0 +1,135 @@
+@using System.Net.Http.Json
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Forms
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudTextField T="string" Label="Ürün Adı" Required="true" RequiredError="Ürün adı zorunludur!" @bind-Value="model.Name" />
+            
+            <MudSelect T="int" Label="Kategori" AnchorOrigin="Origin.BottomCenter" Required="true" @bind-Value="model.CategoryId">
+                @foreach (var cat in Categories)
+                {
+                    <MudSelectItem Value="@cat.Id">@cat.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudNumericField T="decimal" Label="Fiyat" Format="N2" Min="0" @bind-Value="model.Price" />
+            
+            <MudGrid>
+                <MudItem xs="8">
+                     <MudTextField T="string" Label="Resim URL" @bind-Value="model.ImageUrl" HelperText="URL girebilir veya dosya yükleyebilirsiniz." />
+                </MudItem>
+                <MudItem xs="4" Class="d-flex align-center">
+                     <MudFileUpload T="IBrowserFile" FilesChanged="UploadFiles">
+                        <ActivatorContent>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload">Yükle</MudButton>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                </MudItem>
+            </MudGrid>
+            
+            @if (!string.IsNullOrEmpty(model.ImageUrl))
+            {
+                <div class="d-flex justify-center my-2">
+                    <MudImage Src="@model.ImageUrl" Height="100" ObjectFit="ObjectFit.Cover" Class="rounded-lg" />
+                </div>
+            }
+
+            <MudTextField T="string" Label="Açıklama" Lines="3" @bind-Value="model.Description" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">İptal</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public List<CategoryDto> Categories { get; set; } = new();
+    [Parameter] public ProductDto Product { get; set; } = null;
+
+    private ProductDto model = new();
+    private MudForm form;
+    private bool success;
+
+    protected override void OnInitialized()
+    {
+        if (Product != null)
+        {
+            // Clone to avoid editing original reference directly on cancel
+            model = new ProductDto
+            {
+                Id = Product.Id,
+                Name = Product.Name,
+                CategoryId = Product.CategoryId,
+                Price = Product.Price,
+                Description = Product.Description,
+                ImageUrl = Product.ImageUrl
+            };
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await form.Validate();
+        if (success)
+        {
+            try
+            {
+                HttpResponseMessage response;
+                if (Product == null)
+                {
+                    response = await Http.PostAsJsonAsync("api/products", model);
+                }
+                else
+                {
+                    response = await Http.PutAsJsonAsync($"api/products/{model.Id}", model);
+                }
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add(Product == null ? "Ürün eklendi" : "Ürün güncellendi", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add("İşlem başarısız", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Hata: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task UploadFiles(IBrowserFile file)
+    {
+        if (file == null) return;
+        
+        if (file.Size > 512000) // 500KB limit
+        {
+            Snackbar.Add("Dosya boyutu 500KB'dan küçük olmalıdır.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var buffer = new byte[file.Size];
+            await file.OpenReadStream(512000).ReadAsync(buffer);
+            var base64 = Convert.ToBase64String(buffer);
+            model.ImageUrl = $"data:{file.ContentType};base64,{base64}";
+            Snackbar.Add("Resim yüklendi", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Yükleme hatası: {ex.Message}", Severity.Error);
+        }
+    }
+}

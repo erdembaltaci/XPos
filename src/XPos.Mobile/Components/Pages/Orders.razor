@@ -1,0 +1,166 @@
+@page "/orders"
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AuthStateService Auth
+
+<!-- Header -->
+<div class="orders-header">
+    <div class="header-top">
+        <div>
+            <h1 class="header-title">Siparişler</h1>
+            <p class="header-sub">Günün siparişleri</p>
+        </div>
+        <button class="refresh-btn" @onclick="LoadOrders">
+            <MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Style="color:white;" />
+        </button>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="filter-row">
+        <button class="filter-chip @(filter == null ? "active" : "")" @onclick="() => filter = null">Tümü</button>
+        <button class="filter-chip @(filter == "active" ? "active" : "")" @onclick='() => filter = "active"'>Aktif</button>
+        <button class="filter-chip @(filter == "pending" ? "active" : "")" @onclick='() => filter = "pending"'>Onay Bek.</button>
+        <button class="filter-chip @(filter == "completed" ? "active" : "")" @onclick='() => filter = "completed"'>Tamamlanan</button>
+    </div>
+</div>
+
+<!-- Order List -->
+<div class="orders-list">
+    @if (isLoading)
+    {
+        <div class="loading-box">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" Style="color:#818CF8;" />
+        </div>
+    }
+    else if (FilteredOrders.Any())
+    {
+        @foreach (var order in FilteredOrders)
+        {
+            <div class="order-card" @onclick="() => GoToDetails(order.Id)">
+                <div class="order-left">
+                    <div class="order-table">@order.TableNumber</div>
+                    <div class="order-meta">
+                        <span class="order-time">
+                            <MudIcon Icon="@Icons.Material.Filled.AccessTime" Style="font-size:12px;" />
+                            @order.CreatedAt.ToString("HH:mm")
+                        </span>
+                        <span class="order-items-count">@order.Items.Count ürün</span>
+                    </div>
+                </div>
+                <div class="order-right">
+                    <span class="order-status @GetStatusClass(order.Status)">@GetStatusText(order.Status)</span>
+                    <span class="order-amount">@order.TotalAmount.ToString("N0") ₺</span>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <MudIcon Icon="@Icons.Material.Outlined.Receipt" Style="font-size:48px; color:rgba(255,255,255,0.1);" />
+            <p style="color:rgba(255,255,255,0.3); margin-top:12px;">Sipariş bulunamadı</p>
+        </div>
+    }
+</div>
+
+<style>
+    .orders-header {
+        padding: 20px 16px 12px; background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+    }
+    .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .header-title { margin: 0; font-size: 24px; font-weight: 800; color: white; }
+    .header-sub { margin: 4px 0 0; font-size: 13px; color: rgba(255,255,255,0.4); }
+    .refresh-btn {
+        width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.05); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .refresh-btn:active { background: rgba(255,255,255,0.1); transform: scale(0.95); }
+
+    .filter-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .filter-chip {
+        white-space: nowrap; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5);
+        cursor: pointer; transition: all 0.2s;
+    }
+    .filter-chip.active {
+        background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.4); color: #818CF8;
+    }
+
+    .orders-list { padding: 12px 16px; }
+    .loading-box { display: flex; justify-content: center; padding: 48px; }
+
+    .order-card {
+        display: flex; justify-content: space-between; align-items: center; padding: 14px;
+        background: #1E293B; border: 1px solid rgba(255,255,255,0.04); border-radius: 14px;
+        margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    .order-card:active { transform: scale(0.98); background: rgba(255,255,255,0.08); }
+
+    .order-left { flex: 1; }
+    .order-table { font-size: 15px; font-weight: 700; color: white; }
+    .order-meta { display: flex; gap: 10px; margin-top: 4px; }
+    .order-time { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.3); }
+    .order-items-count { font-size: 11px; color: rgba(255,255,255,0.3); }
+
+    .order-right { text-align: right; }
+    .order-status {
+        display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+        padding: 2px 8px; border-radius: 6px; margin-bottom: 4px;
+    }
+    .status-active { background: rgba(52,211,153,0.15); color: #34D399; }
+    .status-pending { background: rgba(251,191,36,0.15); color: #FBBF24; }
+    .status-completed { background: rgba(99,102,241,0.15); color: #818CF8; }
+    .status-cancelled { background: rgba(239,68,68,0.15); color: #F87171; }
+    .order-amount { font-size: 16px; font-weight: 800; color: white; }
+
+    .empty-state {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px;
+    }
+</style>
+
+@code {
+    private List<OrderDto> orders = new();
+    private bool isLoading = true;
+    private string? filter;
+
+    private IEnumerable<OrderDto> FilteredOrders => filter switch
+    {
+        "active" => orders.Where(o => o.Status == OrderStatus.Confirmed || o.Status == OrderStatus.Preparing || o.Status == OrderStatus.Ready),
+        "pending" => orders.Where(o => o.Status == OrderStatus.Pending),
+        "completed" => orders.Where(o => o.Status == OrderStatus.Paid || o.Status == OrderStatus.Cancelled),
+        _ => orders
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadOrders();
+
+    private async Task LoadOrders()
+    {
+        isLoading = true;
+        try { orders = (await Http.GetFromJsonAsync<List<OrderDto>>("api/orders") ?? new()).OrderByDescending(o => o.CreatedAt).ToList(); }
+        catch { }
+        finally { isLoading = false; }
+    }
+
+    private void GoToDetails(int id) => Nav.NavigateTo($"/order-details/{id}");
+
+    private string GetStatusClass(OrderStatus s) => s switch
+    {
+        OrderStatus.Pending => "status-pending",
+        OrderStatus.Confirmed or OrderStatus.Preparing or OrderStatus.Ready => "status-active",
+        OrderStatus.Paid => "status-completed",
+        OrderStatus.Cancelled => "status-cancelled",
+        _ => "status-completed"
+    };
+
+    private string GetStatusText(OrderStatus s) => s switch
+    {
+        OrderStatus.Pending => "Onay Bekliyor",
+        OrderStatus.Confirmed => "Aktif",
+        OrderStatus.Preparing => "Hazırlanıyor",
+        OrderStatus.Ready => "Hazır",
+        OrderStatus.Paid => "Tamamlandı",
+        OrderStatus.Cancelled => "İptal",
+        _ => "—"
+    };
+}

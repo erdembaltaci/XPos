@@ -1,0 +1,617 @@
+@using XPos.Shared.DTOs
+@using XPos.Client.Services
+@using MudBlazor
+@inject CartService CartService
+
+<div class="ai-overlay @(IsOpen ? "open" : "")" @onclick="Close">
+    <div class="ai-panel @(IsOpen ? "open" : "")" @onclick:stopPropagation="true">
+        <!-- Close Button -->
+        <button type="button" class="ai-close-btn" @onclick="Close">✕</button>
+
+        <!-- Progress Bar -->
+        <div class="ai-progress">
+            <div class="ai-progress-fill" style="width: @(currentStep * 20)%"></div>
+        </div>
+
+        <div class="ai-scroll-area">
+            @* ── STEP 0: Initial Intent ── *@
+            @if (currentStep == 0)
+            {
+                <div class="ai-step" @key="0">
+                    <div class="ai-icon-wrapper">
+                        <span class="ai-big-emoji">🤖</span>
+                    </div>
+                    <h2 class="ai-title">Yapay Zeka Asistanı</h2>
+                    <p class="ai-subtitle">Size bugün nasıl yardımcı olabilirim?</p>
+                    
+                    <div class="ai-options">
+                        <button type="button" class="ai-option-btn highlight" @onclick='() => SelectIntent("yemek")'>
+                            <span class="ai-opt-emoji">🍽️</span>
+                            <div>
+                                <span class="ai-opt-label">Karnım Aç</span>
+                                <span class="ai-opt-desc">Güzel bir yemek önerisi al</span>
+                            </div>
+                        </button>
+                        <button type="button" class="ai-option-btn" @onclick='() => SelectIntent("icecek")'>
+                            <span class="ai-opt-emoji">🥤</span>
+                            <div>
+                                <span class="ai-opt-label">Sadece İçecek</span>
+                                <span class="ai-opt-desc">Ferahlatıcı bir şeyler iç</span>
+                            </div>
+                        </button>
+                        <button type="button" class="ai-option-btn" @onclick='() => SelectIntent("tatli")'>
+                            <span class="ai-opt-emoji">🍰</span>
+                            <div>
+                                <span class="ai-opt-label">Tatlı Bir Şeyler</span>
+                                <span class="ai-opt-desc">Günün finalini tatlı yap</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @* ── STEP 1: Hunger Level ── *@
+            @if (currentStep == 1)
+            {
+                <div class="ai-step" @key="1">
+                    <div class="ai-icon-wrapper">
+                        <span class="ai-big-emoji">🍽️</span>
+                    </div>
+                    <h3 class="ai-question">Ne kadar açsınız?</h3>
+                    <p class="ai-subtitle">Açlık durumunuza göre en uygun porsiyonları seçeyim.</p>
+
+                    <div class="ai-options">
+                        <button type="button" class="ai-option-btn" @onclick='() => SelectHunger("az")'>
+                            <span class="ai-opt-emoji">🥗</span>
+                            <div>
+                                <span class="ai-opt-label">Hafif</span>
+                                <span class="ai-opt-desc">Salata veya atıştırmalık</span>
+                            </div>
+                        </button>
+                        <button type="button" class="ai-option-btn" @onclick='() => SelectHunger("orta")'>
+                            <span class="ai-opt-emoji">🍔</span>
+                            <div>
+                                <span class="ai-opt-label">Normal</span>
+                                <span class="ai-opt-desc">Güzel bir öğün</span>
+                            </div>
+                        </button>
+                        <button type="button" class="ai-option-btn" @onclick='() => SelectHunger("cok")'>
+                            <span class="ai-opt-emoji">🥩</span>
+                            <div>
+                                <span class="ai-opt-label">Çok Aç</span>
+                                <span class="ai-opt-desc">Doyurucu ziyafet</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @* ── STEP 2: Main Dish ── *@
+            @if (currentStep == 2)
+            {
+                <div class="ai-step" @key="2">
+                    <div class="ai-thinking">
+                        <span class="ai-think-emoji">🧠</span>
+                        <p class="ai-thinking-text">@hungerLabel açlık seviyenize göre seçtim...</p>
+                    </div>
+
+                    <h3 class="ai-section-title">🍽️ Ana Yemek Önerim</h3>
+                    <div class="ai-product-list">
+                        @foreach (var product in suggestedMains)
+                        {
+                            <button type="button" class="ai-product-card @(selectedMain?.Id == product.Id ? "selected" : "")"
+                                    @onclick="() => SelectMain(product)">
+                                <div class="ai-prod-img-wrap">
+                                    <img src="@product.ImageUrl" class="ai-prod-img" alt="@product.Name" loading="lazy" />
+                                </div>
+                                <div class="ai-prod-info">
+                                    <span class="ai-prod-name">@product.Name</span>
+                                    <span class="ai-prod-desc">@product.Description</span>
+                                    <span class="ai-prod-price">₺@product.Price.ToString("N0")</span>
+                                </div>
+                                @if (selectedMain?.Id == product.Id)
+                                {
+                                    <span class="ai-check">✓</span>
+                                }
+                            </button>
+                        }
+                    </div>
+
+                    @if (selectedMain != null)
+                    {
+                        <button type="button" class="ai-next-btn" @onclick="GoToStep3">
+                            Devam Et →
+                        </button>
+                    }
+                </div>
+            }
+
+            @* ── STEP 3: Drink Pairing ── *@
+            @if (currentStep == 3)
+            {
+                <div class="ai-step" @key="3">
+                    <div class="ai-thinking">
+                        <span class="ai-think-emoji">🍹</span>
+                        <p class="ai-thinking-text"><b>@selectedMain?.Name</b> yanına mükemmel gider...</p>
+                    </div>
+
+                    <h3 class="ai-section-title">🥤 İçecek Önerim</h3>
+                    <div class="ai-product-list">
+                        @foreach (var drink in suggestedDrinks)
+                        {
+                            <button type="button" class="ai-product-card @(selectedDrink?.Id == drink.Id ? "selected" : "")"
+                                    @onclick="() => SelectDrink(drink)">
+                                <div class="ai-prod-img-wrap">
+                                    <img src="@drink.ImageUrl" class="ai-prod-img" alt="@drink.Name" loading="lazy" />
+                                </div>
+                                <div class="ai-prod-info">
+                                    <span class="ai-prod-name">@drink.Name</span>
+                                    <span class="ai-prod-desc">@drink.Description</span>
+                                    <span class="ai-prod-price">₺@drink.Price.ToString("N0")</span>
+                                </div>
+                                @if (selectedDrink?.Id == drink.Id)
+                                {
+                                    <span class="ai-check">✓</span>
+                                }
+                            </button>
+                        }
+                    </div>
+
+                    <div class="ai-nav-row">
+                        <button type="button" class="ai-skip-btn" @onclick="GoToStep4">Geç</button>
+                        @if (selectedDrink != null)
+                        {
+                            <button type="button" class="ai-next-btn" @onclick="GoToStep4">Devam Et →</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ── STEP 4: Dessert ── *@
+            @if (currentStep == 4)
+            {
+                <div class="ai-step" @key="4">
+                    <div class="ai-thinking">
+                        <span class="ai-think-emoji">🍰</span>
+                        <p class="ai-thinking-text">Yemeğin ardından tatlı şart!</p>
+                    </div>
+
+                    <h3 class="ai-section-title">🍫 Tatlı Önerim</h3>
+                    <div class="ai-product-list">
+                        @foreach (var dessert in suggestedDesserts)
+                        {
+                            <button type="button" class="ai-product-card @(selectedDessert?.Id == dessert.Id ? "selected" : "")"
+                                    @onclick="() => SelectDessert(dessert)">
+                                <div class="ai-prod-img-wrap">
+                                    <img src="@dessert.ImageUrl" class="ai-prod-img" alt="@dessert.Name" loading="lazy" />
+                                </div>
+                                <div class="ai-prod-info">
+                                    <span class="ai-prod-name">@dessert.Name</span>
+                                    <span class="ai-prod-desc">@dessert.Description</span>
+                                    <span class="ai-prod-price">₺@dessert.Price.ToString("N0")</span>
+                                </div>
+                                @if (selectedDessert?.Id == dessert.Id)
+                                {
+                                    <span class="ai-check">✓</span>
+                                }
+                            </button>
+                        }
+                    </div>
+
+                    <div class="ai-nav-row">
+                        <button type="button" class="ai-skip-btn" @onclick="ShowSummary">Geç</button>
+                        @if (selectedDessert != null)
+                        {
+                            <button type="button" class="ai-next-btn" @onclick="ShowSummary">Özetimi Gör →</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ── STEP 5: Summary ── *@
+            @if (currentStep == 5)
+            {
+                <div class="ai-step" @key="5">
+                    <div class="ai-icon-wrapper">
+                        <span class="ai-big-emoji">✨</span>
+                    </div>
+                    <h2 class="ai-title">Seçimleriniz Hazır!</h2>
+
+                    <div class="ai-summary">
+                        @if (selectedMain != null)
+                        {
+                            <div class="ai-summary-item">
+                                <img src="@selectedMain.ImageUrl" class="ai-sum-img" alt="@selectedMain.Name" />
+                                <div class="ai-sum-info">
+                                    <span class="ai-sum-tag">🍽️ Ana Yemek</span>
+                                    <span class="ai-sum-name">@selectedMain.Name</span>
+                                </div>
+                                <span class="ai-sum-price">₺@selectedMain.Price.ToString("N0")</span>
+                            </div>
+                        }
+                        @if (selectedDrink != null)
+                        {
+                            <div class="ai-summary-item">
+                                <img src="@selectedDrink.ImageUrl" class="ai-sum-img" alt="@selectedDrink.Name" />
+                                <div class="ai-sum-info">
+                                    <span class="ai-sum-tag">🥤 İçecek</span>
+                                    <span class="ai-sum-name">@selectedDrink.Name</span>
+                                </div>
+                                <span class="ai-sum-price">₺@selectedDrink.Price.ToString("N0")</span>
+                            </div>
+                        }
+                        @if (selectedDessert != null)
+                        {
+                            <div class="ai-summary-item">
+                                <img src="@selectedDessert.ImageUrl" class="ai-sum-img" alt="@selectedDessert.Name" />
+                                <div class="ai-sum-info">
+                                    <span class="ai-sum-tag">🍰 Tatlı</span>
+                                    <span class="ai-sum-name">@selectedDessert.Name</span>
+                                </div>
+                                <span class="ai-sum-price">₺@selectedDessert.Price.ToString("N0")</span>
+                            </div>
+                        }
+
+                        <div class="ai-summary-total">
+                            <span>Toplam</span>
+                            <span class="ai-total-price">₺@GetTotal().ToString("N0")</span>
+                        </div>
+                    </div>
+
+                    <button type="button" class="ai-add-all-btn" @onclick="AddAllToCart">
+                        🛒 Hepsini Sepete Ekle
+                    </button>
+                    <button type="button" class="ai-restart-btn" @onclick="Reset">
+                        🔄 Yeniden Başla
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ── Overlay ── */
+    .ai-overlay {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); z-index: 10000;
+        display: none; align-items: center; justify-content: center;
+        padding: 16px; backdrop-filter: blur(4px);
+    }
+    .ai-overlay.open { display: flex; }
+
+    /* ── Panel ── */
+    .ai-panel {
+        background: white; border-radius: 24px; width: 100%; max-width: 420px;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.3); position: relative;
+        transform: translateY(20px) scale(0.95); opacity: 0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        max-height: 88vh; display: flex; flex-direction: column;
+    }
+    .ai-panel.open { transform: translateY(0) scale(1); opacity: 1; }
+
+    .ai-close-btn {
+        position: absolute; top: 12px; right: 12px; z-index: 10;
+        width: 32px; height: 32px; border-radius: 50%;
+        border: none; background: #F3F4F6; color: #6B7280;
+        font-size: 16px; cursor: pointer; display: flex;
+        align-items: center; justify-content: center;
+        transition: all 0.2s;
+    }
+    .ai-close-btn:hover { background: #E5E7EB; color: #111827; }
+
+    .ai-scroll-area { overflow-y: auto; flex: 1; }
+
+    /* Progress */
+    .ai-progress { height: 4px; background: #F3F4F6; flex-shrink: 0; }
+    .ai-progress-fill { height: 100%; background: linear-gradient(90deg, #8B5CF6, #A78BFA); border-radius: 4px; transition: width 0.5s ease; }
+
+    /* Step */
+    .ai-step { padding: 24px 20px 20px; animation: aiFadeIn 0.35s ease; }
+    @@keyframes aiFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .ai-icon-wrapper { text-align: center; margin-bottom: 8px; }
+    .ai-big-emoji { font-size: 48px; display: inline-block; animation: aiBounce 1.5s ease infinite; }
+    @@keyframes aiBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+    .ai-title { font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800; text-align: center; color: #111827; margin: 0 0 6px; }
+    .ai-subtitle { text-align: center; color: #6B7280; font-size: 0.88rem; margin: 0 0 20px; }
+
+    /* Question Card */
+    .ai-question-card {
+        background: linear-gradient(135deg, #EDE9FE, #F5F3FF); border-radius: 16px;
+        padding: 16px; text-align: center; margin-bottom: 16px; border: 1px solid #DDD6FE;
+    }
+    .ai-q-emoji { font-size: 28px; }
+    .ai-question { font-size: 1.05rem; font-weight: 700; color: #4C1D95; margin: 8px 0 0; }
+
+    /* Options */
+    .ai-options { display: flex; flex-direction: column; gap: 10px; }
+    .ai-option-btn {
+        display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+        border-radius: 14px; border: 2px solid #E5E7EB; background: white;
+        cursor: pointer; transition: all 0.25s; text-align: left;
+        font-family: inherit;
+    }
+    .ai-option-btn:hover { border-color: #8B5CF6; background: #FAFAFE; transform: translateX(4px); }
+    .ai-option-btn:active { transform: scale(0.97); border-color: #7C3AED; }
+    .ai-option-btn.highlight { border-color: #8B5CF6; background: rgba(139, 92, 246, 0.05); }
+    .ai-opt-emoji { font-size: 32px; flex-shrink: 0; }
+    .ai-opt-label { font-weight: 700; font-size: 1rem; color: #111827; display: block; }
+    .ai-opt-desc { font-size: 0.78rem; color: #9CA3AF; display: block; margin-top: 1px; }
+
+    /* Thinking */
+    .ai-thinking { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; background: #F9FAFB; padding: 12px 16px; border-radius: 14px; }
+    .ai-think-emoji { font-size: 28px; flex-shrink: 0; }
+    .ai-thinking-text { font-size: 0.88rem; color: #374151; margin: 0; flex: 1; }
+
+    /* Section Title */
+    .ai-section-title { font-size: 1rem; font-weight: 700; color: #111827; margin: 0 0 12px; }
+
+    /* Product List */
+    .ai-product-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .ai-product-card {
+        display: flex; align-items: center; gap: 12px; padding: 10px;
+        border-radius: 14px; border: 2px solid #F3F4F6; background: white;
+        cursor: pointer; transition: all 0.2s; position: relative; text-align: left;
+        font-family: inherit;
+    }
+    .ai-product-card:hover { border-color: #C4B5FD; }
+    .ai-product-card.selected { border-color: #8B5CF6; background: #FAF5FF; box-shadow: 0 2px 12px rgba(139,92,246,0.15); }
+    .ai-product-card:active { transform: scale(0.98); }
+
+    .ai-prod-img-wrap { width: 56px; height: 56px; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+    .ai-prod-img { width: 100%; height: 100%; object-fit: cover; }
+    .ai-prod-info { flex: 1; min-width: 0; }
+    .ai-prod-name { font-weight: 700; font-size: 0.88rem; color: #111827; display: block; }
+    .ai-prod-desc { font-size: 0.73rem; color: #9CA3AF; display: block; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ai-prod-price { font-weight: 800; font-size: 0.88rem; color: #8B5CF6; display: block; margin-top: 3px; }
+    .ai-check {
+        position: absolute; top: 8px; right: 10px;
+        width: 22px; height: 22px; border-radius: 50%;
+        background: #8B5CF6; color: white; font-size: 12px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Navigation */
+    .ai-nav-row { display: flex; gap: 10px; align-items: center; }
+    .ai-skip-btn {
+        padding: 11px 20px; border-radius: 12px; border: 2px solid #E5E7EB;
+        background: white; color: #6B7280; font-weight: 600; font-size: 0.85rem;
+        cursor: pointer; transition: all 0.2s; font-family: inherit;
+    }
+    .ai-skip-btn:hover { border-color: #9CA3AF; }
+
+    .ai-next-btn {
+        flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+        padding: 12px 20px; border-radius: 12px; border: none;
+        background: linear-gradient(135deg, #8B5CF6, #7C3AED); color: white;
+        font-weight: 700; font-size: 0.9rem; cursor: pointer;
+        box-shadow: 0 4px 14px rgba(139,92,246,0.3); transition: all 0.25s;
+        font-family: inherit;
+    }
+    .ai-next-btn:hover { box-shadow: 0 6px 20px rgba(139,92,246,0.4); transform: translateY(-1px); }
+    .ai-next-btn:active { transform: scale(0.97); }
+
+    /* Summary */
+    .ai-summary { margin: 16px 0; }
+    .ai-summary-item {
+        display: flex; align-items: center; gap: 12px; padding: 10px;
+        border-bottom: 1px solid #F3F4F6;
+    }
+    .ai-sum-img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; }
+    .ai-sum-info { flex: 1; }
+    .ai-sum-tag { font-size: 0.68rem; font-weight: 600; color: #8B5CF6; display: block; text-transform: uppercase; letter-spacing: 0.03em; }
+    .ai-sum-name { font-weight: 700; font-size: 0.88rem; color: #111827; display: block; }
+    .ai-sum-price { font-weight: 800; font-size: 0.95rem; color: #111827; }
+
+    .ai-summary-total {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 14px 10px 4px; font-weight: 700; font-size: 1.1rem; color: #111827;
+    }
+    .ai-total-price { color: #7C3AED; font-size: 1.3rem; font-weight: 800; }
+
+    /* Add All */
+    .ai-add-all-btn {
+        width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+        padding: 14px; border-radius: 14px; border: none;
+        background: linear-gradient(135deg, #8B5CF6, #7C3AED); color: white;
+        font-weight: 700; font-size: 1rem; cursor: pointer;
+        box-shadow: 0 6px 20px rgba(139,92,246,0.35); transition: all 0.25s;
+        margin-bottom: 10px; font-family: inherit;
+    }
+    .ai-add-all-btn:hover { box-shadow: 0 8px 28px rgba(139,92,246,0.45); transform: translateY(-2px); }
+    .ai-add-all-btn:active { transform: scale(0.97); }
+
+    .ai-restart-btn {
+        width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+        padding: 10px; border-radius: 12px; border: 2px solid #E5E7EB;
+        background: white; color: #6B7280; font-weight: 600; font-size: 0.85rem;
+        cursor: pointer; transition: all 0.2s; font-family: inherit;
+    }
+    .ai-restart-btn:hover { border-color: #8B5CF6; color: #8B5CF6; }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    [Parameter] public List<ProductDto> AllProducts { get; set; } = new();
+    [Parameter] public List<CategoryDto> AllCategories { get; set; } = new();
+
+    private int currentStep = 0;
+    private string hungerLevel = "";
+    private string hungerLabel = "";
+
+    private List<ProductDto> suggestedMains = new();
+    private List<ProductDto> suggestedDrinks = new();
+    private List<ProductDto> suggestedDesserts = new();
+
+    private ProductDto? selectedMain;
+    private ProductDto? selectedDrink;
+    private ProductDto? selectedDessert;
+
+    private static Random rng = new();
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+        Reset();
+    }
+
+    private void SelectIntent(string intent)
+    {
+        if (intent == "yemek") { currentStep = 1; }
+        else if (intent == "icecek") { GoToStep3(); }
+        else if (intent == "tatli") { GoToStep4(); }
+        StateHasChanged();
+    }
+
+    private void SelectHunger(string level)
+    {
+        hungerLevel = level;
+        hungerLabel = level switch { "az" => "Hafif", "orta" => "Normal", _ => "Yüksek" };
+
+        var saladCatId = AllCategories.FirstOrDefault(c => c.Name == "Salatalar")?.Id ?? 0;
+        var starterCatId = AllCategories.FirstOrDefault(c => c.Name == "Başlangıçlar")?.Id ?? 0;
+        var burgerCatId = AllCategories.FirstOrDefault(c => c.Name == "Burgerler")?.Id ?? 0;
+        var pizzaCatId = AllCategories.FirstOrDefault(c => c.Name == "Pizzalar")?.Id ?? 0;
+        var mainCatId = AllCategories.FirstOrDefault(c => c.Name == "Ana Yemekler")?.Id ?? 0;
+        var pastaCatId = AllCategories.FirstOrDefault(c => c.Name == "Makarnalar")?.Id ?? 0;
+
+        suggestedMains = level switch
+        {
+            "az" => AllProducts
+                .Where(p => p.CategoryId == saladCatId || p.CategoryId == starterCatId)
+                .OrderBy(_ => rng.Next()).Take(4).ToList(),
+            "orta" => AllProducts
+                .Where(p => p.CategoryId == burgerCatId || p.CategoryId == pizzaCatId || p.CategoryId == pastaCatId)
+                .OrderBy(_ => rng.Next()).Take(4).ToList(),
+            _ => AllProducts
+                .Where(p => p.CategoryId == mainCatId || p.CategoryId == burgerCatId)
+                .OrderBy(_ => rng.Next()).Take(4).ToList()
+        };
+
+        currentStep = 2;
+        StateHasChanged();
+    }
+
+    private void SelectMain(ProductDto product)
+    {
+        selectedMain = product;
+        StateHasChanged();
+    }
+
+    private void SelectDrink(ProductDto product)
+    {
+        selectedDrink = product;
+        StateHasChanged();
+    }
+
+    private void SelectDessert(ProductDto product)
+    {
+        selectedDessert = product;
+        StateHasChanged();
+    }
+
+    private void GoToStep3()
+    {
+        var drinkCatId = AllCategories.FirstOrDefault(c => c.Name == "İçecekler")?.Id ?? 0;
+        var allDrinks = AllProducts.Where(p => p.CategoryId == drinkCatId).ToList();
+
+        // 1. Identify "Meal Type"
+        bool isHeavyMeal = false;
+        if (selectedMain != null)
+        {
+            var catName = AllCategories.FirstOrDefault(c => c.Id == selectedMain.CategoryId)?.Name ?? "";
+            isHeavyMeal = catName == "Burgerler" || catName == "Pizzalar" || catName == "Ana Yemekler" || catName == "Makarnalar";
+        }
+
+        // 2. Filter Drinks Logic
+        //    - Exclude Hot Drinks / Breakfast Juices from Dinner pairing
+        //    - Prioritize Cola/Fanta/Ayran/Şalgam/IceTea for Heavy Meals
+        //    - Prioritize Water/Soda/Lemonade for Light Meals
+        
+        var mealDrinks = allDrinks.Where(d => 
+            !d.Name.Contains("Kahve", StringComparison.OrdinalIgnoreCase) && 
+            !d.Name.Contains("Latte", StringComparison.OrdinalIgnoreCase) &&
+            !d.Name.Contains("Cappuccino", StringComparison.OrdinalIgnoreCase) &&
+            !d.Name.Contains("Espresso", StringComparison.OrdinalIgnoreCase) &&
+            !d.Name.Contains("Çay", StringComparison.OrdinalIgnoreCase) && // Hot Tea
+            !d.Name.Contains("Sıcak", StringComparison.OrdinalIgnoreCase)
+        ).ToList();
+
+        // Further refinement based on meal heaviness
+        if (isHeavyMeal)
+        {
+            // Prefer Fizzy, Ayran, Ice Tea
+            suggestedDrinks = mealDrinks
+                .OrderByDescending(d => 
+                    d.Name.Contains("Kola") || 
+                    d.Name.Contains("Fanta") || 
+                    d.Name.Contains("Ayran") || 
+                    d.Name.Contains("Şalgam") || 
+                    d.Name.Contains("Ice Tea"))
+                .ThenBy(_ => rng.Next())
+                .Take(4).ToList();
+        }
+        else
+        {
+            // Prefer Water, Soda, Lemonade, Fresh Juice
+            suggestedDrinks = mealDrinks
+                .OrderByDescending(d => 
+                    d.Name.Contains("Su") || 
+                    d.Name.Contains("Soda") || 
+                    d.Name.Contains("Limonata") || 
+                    d.Name.Contains("Ice Tea"))
+                .ThenBy(_ => rng.Next())
+                .Take(4).ToList();
+        }
+
+        currentStep = 3;
+        StateHasChanged();
+    }
+
+    private void GoToStep4()
+    {
+        var dessertCatId = AllCategories.FirstOrDefault(c => c.Name == "Tatlılar")?.Id ?? 0;
+        suggestedDesserts = AllProducts
+            .Where(p => p.CategoryId == dessertCatId)
+            .OrderBy(_ => rng.Next()).Take(4).ToList();
+        currentStep = 4;
+        StateHasChanged();
+    }
+
+    private void ShowSummary()
+    {
+        currentStep = 5;
+        StateHasChanged();
+    }
+
+    private decimal GetTotal()
+    {
+        decimal total = 0;
+        if (selectedMain != null) total += selectedMain.Price;
+        if (selectedDrink != null) total += selectedDrink.Price;
+        if (selectedDessert != null) total += selectedDessert.Price;
+        return total;
+    }
+
+    private async Task AddAllToCart()
+    {
+        if (selectedMain != null) CartService.AddToCart(selectedMain);
+        if (selectedDrink != null) CartService.AddToCart(selectedDrink);
+        if (selectedDessert != null) CartService.AddToCart(selectedDessert);
+        await Close();
+    }
+
+    private void Reset()
+    {
+        currentStep = 0;
+        hungerLevel = "";
+        selectedMain = null;
+        selectedDrink = null;
+        selectedDessert = null;
+    }
+}

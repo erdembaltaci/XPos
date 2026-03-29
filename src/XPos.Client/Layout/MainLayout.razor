@@ -1,0 +1,185 @@
+﻿@inherits LayoutComponentBase
+@using XPos.Client.Themes
+@using XPos.Client.Services
+@inject CartService CartService
+@inject NavigationManager Nav
+@implements IDisposable
+
+<MudThemeProvider Theme="ModernTheme.DefaultTheme" IsDarkMode="false" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout Class="app-layout">
+    <!-- Compact Header -->
+    <MudAppBar Elevation="0" Fixed="true" Dense="true" Class="app-header">
+        <MudIcon Icon="@Icons.Material.Filled.RestaurantMenu" Color="Color.Primary" Size="Size.Medium" Class="mr-2" />
+        <MudText Typo="Typo.h6" Color="Color.Primary" Style="font-weight: 800; letter-spacing: -0.5px; font-family: 'Outfit', sans-serif;">Lezzet Durağı</MudText>
+        <MudSpacer />
+
+
+
+        <!-- Cart (Desktop) -->
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="d-none d-md-flex cart-desktop-btn"
+                   StartIcon="@Icons.Material.Filled.ShoppingBag" Href="/cart" Size="Size.Small">
+            Sepet
+            @if (CartService.Items.Any())
+            {
+                <span class="cart-count-badge">@CartService.Items.Sum(i => i.Quantity)</span>
+            }
+        </MudButton>
+
+        <!-- Cart (Mobile) -->
+        <a href="/cart" class="d-md-none cart-mobile-btn">
+            <MudIcon Icon="@Icons.Material.Outlined.ShoppingBag" Color="Color.Primary" />
+            @if (CartService.Items.Any())
+            {
+                <span class="cart-mobile-badge">@CartService.Items.Sum(i => i.Quantity)</span>
+            }
+        </a>
+    </MudAppBar>
+
+    <MudMainContent Class="main-content">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="px-0">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+
+    <!-- Mobile Bottom Nav -->
+    <div class="bottom-nav d-md-none">
+        <a href="/" class="bnav-item @(IsActive("/") ? "active" : "")">
+            <MudIcon Icon="@(IsActive("/") ? Icons.Material.Filled.Home : Icons.Material.Outlined.Home)" />
+            <span>Menü</span>
+        </a>
+        <a href="/cart" class="bnav-item bnav-center">
+            <div class="bnav-fab">
+                <MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Style="color: white;" />
+                @if (CartService.Items.Any())
+                {
+                    <span class="bnav-fab-badge">@CartService.Items.Sum(i => i.Quantity)</span>
+                }
+            </div>
+        </a>
+    </div>
+</MudLayout>
+
+<style>
+    /* ── Global ── */
+    :root {
+        --nav-height: 56px;
+        --bottom-nav: 76px;
+    }
+    body {
+        background-color: #F9FAFB !important;
+        font-family: 'Inter', 'system-ui', sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .app-layout { min-height: 100vh; }
+
+    /* ── Header ── */
+    .app-header {
+        background: rgba(255,255,255,0.92) !important;
+        backdrop-filter: blur(12px) !important;
+        border-bottom: 1px solid #F2F4F7 !important;
+        height: var(--nav-height) !important;
+        padding: 0 16px !important;
+    }
+
+    .header-nav-link {
+        font-weight: 600 !important; font-size: 0.9rem !important;
+        color: #6B7280 !important; transition: color 0.2s !important;
+        padding: 4px 0 !important;
+    }
+    .header-nav-link:hover, .header-nav-link.active {
+        color: #FF5500 !important;
+    }
+
+    .cart-desktop-btn {
+        border-radius: 24px !important; padding: 4px 16px !important;
+        font-weight: 700 !important; text-transform: none !important;
+        font-size: 0.85rem !important;
+    }
+    .cart-count-badge {
+        background: rgba(255,255,255,0.3); padding: 1px 7px;
+        border-radius: 10px; font-size: 0.75rem; margin-left: 6px;
+        font-weight: 800;
+    }
+
+    .cart-mobile-btn {
+        position: relative; text-decoration: none; padding: 8px;
+    }
+    .cart-mobile-badge {
+        position: absolute; top: 2px; right: 2px;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: #EF4444; color: white;
+        font-size: 10px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
+        border: 2px solid white;
+    }
+
+    /* ── Main Content ── */
+    .main-content {
+        padding-top: var(--nav-height) !important;
+        padding-bottom: calc(var(--bottom-nav) + 20px) !important;
+        min-height: 100vh;
+    }
+
+    /* ── Bottom Nav ── */
+    .bottom-nav {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        height: var(--bottom-nav); background: white;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
+        display: flex; justify-content: space-around; align-items: flex-end;
+        z-index: 1000; padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+        border-top-left-radius: 24px; border-top-right-radius: 24px;
+    }
+
+    .bnav-item {
+        display: flex; flex-direction: column; align-items: center;
+        color: #9CA3AF; text-decoration: none; font-size: 10px;
+        font-weight: 600; gap: 2px; transition: all 0.2s;
+        padding-bottom: 6px; width: 60px;
+    }
+    .bnav-item.active { color: #FF5500; }
+
+    .bnav-center { position: relative; top: -18px; }
+    .bnav-fab {
+        width: 54px; height: 54px; border-radius: 50%;
+        background: linear-gradient(135deg, #FF5500, #FF7A33);
+        box-shadow: 0 8px 20px rgba(255,85,0,0.35);
+        display: flex; align-items: center; justify-content: center;
+        transition: transform 0.2s; border: 3px solid #F9FAFB; position: relative;
+    }
+    .bnav-fab:active { transform: scale(0.93); }
+    .bnav-fab-badge {
+        position: absolute; top: -3px; right: -3px;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: #EF4444; color: white;
+        font-size: 10px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
+        border: 2px solid white;
+    }
+
+    /* ── MudDialog z-index override ── */
+    .mud-overlay { z-index: 10000 !important; }
+    .mud-dialog-container { z-index: 10001 !important; }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        CartService.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        CartService.OnChange -= StateHasChanged;
+    }
+
+    private bool IsActive(string path)
+    {
+        var uri = Nav.ToBaseRelativePath(Nav.Uri);
+        if (path == "/") return string.IsNullOrEmpty(uri);
+        return uri.StartsWith(path.TrimStart('/'));
+    }
+}
