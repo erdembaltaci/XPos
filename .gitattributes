@@ -1,0 +1,10 @@
+# .razor dosyalarini C# olarak say (HTML %'si yüksek görünmesin)
+*.razor linguist-language=C#
+
+# wwwroot icindeki hazir kutuphaneleri (css, js, lib) dilden sayma
+src/XPos.Client/wwwroot/** linguist-generated=true
+src/XPos.Mobile/wwwroot/** linguist-generated=true
+
+# Dokumantasyon haricindeki dosyalari dilden sayma
+ml_data/*.json linguist-generated=true
+ml_data/*.csv linguist-generated=true
