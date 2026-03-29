@@ -112,4 +112,64 @@ public class MlController : ControllerBase
         }
         catch { return Ok(new { active = false }); }
     }
+
+    [HttpPost("recommendations/basket")]
+    public async Task<IActionResult> GetBasketRecommendations([FromBody] JsonElement request)
+    {
+        try
+        {
+            // Case-insensitive check for Products and Limit
+            JsonElement productsProperty = default;
+            int limit = 6;
+
+            foreach (var prop in request.EnumerateObject())
+            {
+                if (prop.Name.Equals("products", StringComparison.OrdinalIgnoreCase))
+                    productsProperty = prop.Value;
+                else if (prop.Name.Equals("limit", StringComparison.OrdinalIgnoreCase))
+                    limit = prop.Value.GetInt32();
+            }
+
+            if (productsProperty.ValueKind == JsonValueKind.Array)
+            {
+                var basketProductNames = productsProperty.EnumerateArray()
+                    .Select(p => p.GetString())
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToHashSet();
+
+                // Get all products to build the ML request with full objects
+                var allProducts = await _productService.GetAllProductsAsync();
+                
+                var cartProducts = allProducts
+                    .Where(p => basketProductNames.Contains(p.Name))
+                    .Select(p => new { id = p.Id, name = p.Name, price = (double)p.Price, categoryId = p.CategoryId })
+                    .ToList();
+                    
+                var availableProducts = allProducts
+                    .Select(p => new { id = p.Id, name = p.Name, price = (double)p.Price, categoryId = p.CategoryId })
+                    .ToList();
+
+                var mlPayload = new
+                {
+                    cart_products = cartProducts,
+                    available_products = availableProducts,
+                    limit = limit
+                };
+
+                // Python ML servisine akıllı sepet isteği gönderiyoruz
+                var response = await _mlClient.PostAsJsonAsync("api/recommendations/smart-basket", mlPayload);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    return Content(content, "application/json");
+                }
+            }
+            return BadRequest("Invalid request format: 'Products' array missing.");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(503, $"ML Service unavailable: {ex.Message}");
+        }
+    }
 }

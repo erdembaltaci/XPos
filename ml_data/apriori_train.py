@@ -119,7 +119,7 @@ print(f"\n✓ {CIKTI_CSV} kaydedildi ({len(rules)} kural)")
 import json
 
 oneriler = []
-for _, row in rules[rules["confidence"] >= 0.55].iterrows():
+for _, row in rules[rules["confidence"] >= 0.10].iterrows():
     oneriler.append({
         "tetikleyici":  row["antecedents_str"],
         "oneri":        row["consequents_str"],

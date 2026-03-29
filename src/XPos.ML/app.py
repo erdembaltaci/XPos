@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
 import os
+import sqlite3
 import pandas as pd
 from typing import Optional, List
 import random
@@ -297,6 +298,9 @@ KEYWORD_ALIASES_MAP = {
 
 @app.post("/api/recommendations/smart-basket")
 def smart_basket_recommendations(req: SmartBasketRequest):
+    print(f"\n🔍 AI DEBUG: Sepet Önerisi İsteği Alındı")
+    print(f"   Sepetteki Ürünler: {[p.name for p in req.cart_products]}")
+    
     """
     Smart cart-aware recommendations using:
     1. Category-based complementary matching (primary)
@@ -424,20 +428,20 @@ def smart_basket_recommendations(req: SmartBasketRequest):
         norm_conf = min(0.95, max(0.50, item["score"] / max(max_score, 0.01) * 0.95))
 
         result.append({
-            "productId": item["product"].id,
-            "name": item["product"].name,
-            "price": item["product"].price,
-            "categoryId": item["product"].categoryId,
-            "confidence": round(norm_conf, 2),
-            "reason": item["reasons"][0] if item["reasons"] else "popular"
+            "ProductId": item["product"].id,
+            "Name": item["product"].name,
+            "Price": item["product"].price,
+            "CategoryId": item["product"].categoryId,
+            "Confidence": round(norm_conf, 2),
+            "Reason": item["reasons"][0] if item["reasons"] else "popular"
         })
 
         if len(result) >= req.limit:
             break
 
     return {
-        "recommendations": result,
-        "count": len(result)
+        "Recommendations": result,
+        "Count": len(result)
     }
 
 

@@ -1,4 +1,4 @@
-@inherits LayoutComponentBase
+ï»¿@inherits LayoutComponentBase
 @using Microsoft.Maui.Devices
 @using XPos.Mobile.Themes
 
@@ -39,22 +39,26 @@
                     <span>Mutfak Paneli</span>
                 </a>
 
-                <div class="nav-section-title" style="margin-top:24px;">YÖNETIM</div>
+                <div class="nav-section-title" style="margin-top:24px;">YÃ–NETIM</div>
                 <a class="sidebar-link @(IsActive("/desktop/menu") ? "active" : "")" @onclick='() => Nav.NavigateTo("/desktop/menu")'>
                     <MudIcon Icon="@Icons.Material.Filled.QrCode" Style="font-size:20px;" />
-                    <span>QR Menü Yönetimi</span>
+                    <span>QR MenÃ¼ YÃ¶netimi</span>
                 </a>
                 <a class="sidebar-link @(IsActive("/desktop/tables") ? "active" : "")" @onclick='() => Nav.NavigateTo("/desktop/tables")'>
                     <MudIcon Icon="@Icons.Material.Filled.TableChart" Style="font-size:20px;" />
-                    <span>Masa Yönetimi</span>
+                    <span>Masa YÃ¶netimi</span>
                 </a>
                 <a class="sidebar-link @(IsActive("/d/products") ? "active" : "")" @onclick='() => Nav.NavigateTo("/d/products")'>
                     <MudIcon Icon="@Icons.Material.Filled.Inventory2" Style="font-size:20px;" />
-                    <span>Ürünler</span>
+                    <span>ÃœrÃ¼nler</span>
                 </a>
                 <a class="sidebar-link @(IsActive("/desktop/staff") ? "active" : "")" @onclick='() => Nav.NavigateTo("/desktop/staff")'>
                     <MudIcon Icon="@Icons.Material.Filled.People" Style="font-size:20px;" />
                     <span>Personel</span>
+                </a>
+                <a class="sidebar-link @(IsActive("/d/reports") ? "active" : "")" @onclick='() => Nav.NavigateTo("/d/reports")'>
+                    <MudIcon Icon="@Icons.Material.Filled.BarChart" Style="font-size:20px;" />
+                    <span>Raporlar (SatÄ±ÅŸ)</span>
                 </a>
             </div>
         </nav>
@@ -73,7 +77,7 @@
                     {
                         <div class="weather-badge">
                             <MudIcon Icon="@GetWeatherIcon(weatherCondition)" Style="font-size:18px; color:#38BDF8;" />
-                            <span class="weather-text">@(temperature)°C @weatherCondition</span>
+                            <span class="weather-text">@(temperature)Â°C @weatherCondition</span>
                         </div>
                     }
                     <div class="header-user">
@@ -122,7 +126,7 @@ else
             </a>
             <a class="nav-item logout" @onclick="Logout">
                 <MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />
-                <span>Çikis</span>
+                <span>Ã‡ikis</span>
             </a>
         </nav>
     </div>
@@ -311,7 +315,8 @@ else
             "" => "Dashboard",
             _ when uri.StartsWith("d/tables") => "Masalar",
             _ when uri.StartsWith("d/orders") => "Siparisler",
-            _ when uri.StartsWith("d/products") => "Ürünler",
+            _ when uri.StartsWith("d/products") => "ÃœrÃ¼nler",
+            _ when uri.StartsWith("d/reports") => "Raporlar",
             _ => "Dashboard"
         };
     }
@@ -344,9 +349,9 @@ else
     {
         return condition.ToLower() switch
         {
-            var c when c.Contains("günes") || c.Contains("açik") => Icons.Material.Filled.WbSunny,
+            var c when c.Contains("gÃ¼nes") || c.Contains("aÃ§ik") => Icons.Material.Filled.WbSunny,
             var c when c.Contains("bulut") || c.Contains("kapali") => Icons.Material.Filled.Cloud,
-            var c when c.Contains("yagmur") || c.Contains("çise") || c.Contains("saganak") => Icons.Material.Filled.WaterDrop,
+            var c when c.Contains("yagmur") || c.Contains("Ã§ise") || c.Contains("saganak") => Icons.Material.Filled.WaterDrop,
             var c when c.Contains("kar") || c.Contains("sulu kar") => Icons.Material.Filled.AcUnit,
             var c when c.Contains("simsek") || c.Contains("firtina") => Icons.Material.Filled.Thunderstorm,
             var c when c.Contains("sis") => Icons.Material.Filled.Cloud,
