@@ -2,6 +2,8 @@
 @using XPos.Client.Services
 @using MudBlazor
 @inject CartService CartService
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
 
 <MudDialog Class="product-dialog-wrapper" ContentClass="p-0">
     <DialogContent>
@@ -22,7 +24,17 @@
                 <button class="pd-close-btn" @onclick="Cancel">
                     <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
                 </button>
-                <div class="pd-image-price">₺@Product.Price.ToString("N0")</div>
+                @if (!Product.IsAvailable)
+                {
+                    <div class="pd-image-price out-of-stock">₺@Product.Price.ToString("N0")</div>
+                    <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.4); backdrop-filter:grayscale(1);">
+                        <div style="background:#F43F5E; color:white; padding:8px 24px; border-radius:12px; font-weight:900; font-size:1.5rem; border:3px solid white; box-shadow:0 10px 30px rgba(244,63,94,0.5); transform:rotate(-10deg);">TÜKENDİ</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="pd-image-price">₺@Product.Price.ToString("N0")</div>
+                }
             </div>
 
             <!-- Content -->
@@ -48,20 +60,26 @@
     </DialogContent>
     <DialogActions>
         <div class="pd-footer">
-            <button class="pd-add-to-cart" @onclick="Submit">
-                <MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Size="Size.Small" />
-                <span>Sepete Ekle</span>
-                <span class="pd-total-price">₺@((Product.Price * quantity).ToString("N0"))</span>
-            </button>
+            @if (Product.IsAvailable)
+            {
+                <button class="pd-add-to-cart" @onclick="Submit">
+                    <MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Size="Size.Small" />
+                    <span>Sepete Ekle</span>
+                    <span class="pd-total-price">₺@((Product.Price * quantity).ToString("N0"))</span>
+                </button>
+            }
+            else
+            {
+                <button class="pd-add-to-cart disabled" disabled>
+                    <MudIcon Icon="@Icons.Material.Filled.Block" Size="Size.Small" />
+                    <span>Ürün Tükendi</span>
+                </button>
+            }
         </div>
     </DialogActions>
 </MudDialog>
 
 <style>
-    /* Dialog z-index fix */
-    .mud-overlay { z-index: 10000 !important; }
-    .mud-dialog-container { z-index: 10001 !important; }
-
     .product-dialog-wrapper {
         border-radius: 20px !important; overflow: hidden;
         max-width: 420px !important; width: 100% !important;
@@ -106,6 +124,7 @@
         font-weight: 800; font-size: 1.25rem; color: #FF5500;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
+    .pd-image-price.out-of-stock { color: #94A3B8; text-decoration: line-through; }
 
     /* Content */
     .pd-content { padding: 20px 20px 8px; }
@@ -148,6 +167,13 @@
         box-shadow: 0 8px 28px rgba(255,85,0,0.45);
         transform: translateY(-2px);
     }
+    .pd-add-to-cart.disabled {
+        background: #F3F4F6 !important;
+        color: #9CA3AF !important;
+        cursor: not-allowed;
+        box-shadow: none !important;
+        transform: none !important;
+    }
     .pd-add-to-cart:active { transform: scale(0.97); }
     .pd-total-price {
         background: rgba(255,255,255,0.2); padding: 4px 12px;
@@ -161,6 +187,29 @@
     [Parameter] public ProductDto Product { get; set; } = new();
 
     private int quantity = 1;
+    private CampaignInfo? activeCampaign;
+    private List<CategoryDto> categories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            categories = await Http.GetFromJsonAsync<List<CategoryDto>>("api/categories") ?? new();
+            var campResp = await Http.GetFromJsonAsync<ActiveCampaignResponse>("api/ml/campaigns/active");
+            if (campResp is { Active: true, Campaign: not null })
+                activeCampaign = campResp.Campaign;
+            else
+            {
+                var suggest = await Http.GetFromJsonAsync<SuggestedCampaignResponse>("api/ml/campaigns/suggest");
+                activeCampaign = suggest?.Suggestion;
+            }
+        }
+        catch { }
+    }
+
+    private record ActiveCampaignResponse(bool Active, CampaignInfo? Campaign);
+    private record SuggestedCampaignResponse(CampaignInfo? Suggestion);
+    private record CampaignInfo(string Id, string Title, string Description, int DiscountPercent, List<string> TargetCategories);
 
     private void UpdateQuantity(int change)
     {
@@ -170,12 +219,26 @@
 
     private void Cancel() => MudDialog.Cancel();
 
-    private void Submit()
+    private async Task Submit()
     {
         for (int i = 0; i < quantity; i++)
         {
             CartService.AddToCart(Product);
         }
+
+        if (IsProductInCampaign(Product))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"🚀 Kampanya Uygulandı!\n{Product.Name} ürünü '{activeCampaign?.Title}' kapsamında sepete eklendi.");
+        }
+
         MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private bool IsProductInCampaign(ProductDto product)
+    {
+        if (activeCampaign == null) return false;
+        var cat = categories.FirstOrDefault(c => c.Id == product.CategoryId);
+        if (cat == null) return false;
+        return activeCampaign.TargetCategories.Any(t => cat.Name.Contains(t, StringComparison.OrdinalIgnoreCase));
     }
 }

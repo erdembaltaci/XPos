@@ -42,6 +42,11 @@ public class StaffController : ControllerBase
 
     public async Task<ActionResult<StaffDto>> CreateStaff(CreateStaffDto dto)
     {
+        if (dto.Phone?.Length != 10 || dto.Phone.StartsWith("0"))
+            return BadRequest("Telefon 10 haneli ve basinda 0 olmadan olmalidir.");
+        if (dto.StaffPassword?.Length != 4)
+            return BadRequest("Sifre tam olarak 4 haneli olmalidir.");
+
         var staff = new Staff
         {
             Name = dto.Name,
@@ -72,6 +77,11 @@ public class StaffController : ControllerBase
 
     public async Task<IActionResult> UpdateStaff(int id, CreateStaffDto dto)
     {
+        if (dto.Phone?.Length != 10 || dto.Phone.StartsWith("0"))
+            return BadRequest("Telefon 10 haneli ve basinda 0 olmadan olmalidir.");
+        if (!string.IsNullOrWhiteSpace(dto.StaffPassword) && dto.StaffPassword.Length != 4)
+            return BadRequest("Sifre tam olarak 4 haneli olmalidir.");
+
         var staff = await _context.Staffs.FindAsync(id);
         if (staff == null) return NotFound();
 

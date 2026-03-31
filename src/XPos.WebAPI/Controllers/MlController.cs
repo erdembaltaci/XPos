@@ -172,4 +172,26 @@ public class MlController : ControllerBase
             return StatusCode(503, $"ML Service unavailable: {ex.Message}");
         }
     }
+
+    [HttpPost("campaigns/activate")]
+    public async Task<IActionResult> ActivateCampaign([FromBody] JsonElement campaign)
+    {
+        try
+        {
+            var response = await _mlClient.PostAsJsonAsync("api/campaigns/activate", campaign);
+            return Ok(new { success = response.IsSuccessStatusCode });
+        }
+        catch { return StatusCode(503, "ML Service offline"); }
+    }
+
+    [HttpPost("campaigns/deactivate")]
+    public async Task<IActionResult> DeactivateCampaign()
+    {
+        try
+        {
+            var response = await _mlClient.PostAsync("api/campaigns/deactivate", null);
+            return Ok(new { success = response.IsSuccessStatusCode });
+        }
+        catch { return StatusCode(503, "ML Service offline"); }
+    }
 }

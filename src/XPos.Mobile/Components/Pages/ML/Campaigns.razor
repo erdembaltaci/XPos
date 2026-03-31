@@ -1,6 +1,7 @@
 @page "/ml/campaigns"
 
 @inject ISnackbar Snackbar
+@inject HttpClient Http
 
 <div class="d-flex justify-space-between align-center mb-4">
     <div class="d-flex align-center gap-3">
@@ -178,8 +179,7 @@
     {
         try
         {
-            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
-            var result = await client.GetFromJsonAsync<ActiveResponse>("/api/campaigns/active");
+            var result = await Http.GetFromJsonAsync<ActiveResponse>("api/ml/campaigns/active");
             if (result?.Active == true && result.Campaign != null)
             {
                 activeCampaign = result.Campaign;
@@ -199,9 +199,8 @@
         loading = true;
         try
         {
-            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
             var hour = DateTime.Now.Hour;
-            var result = await client.GetFromJsonAsync<SuggestResponse>($"/api/campaigns/suggest?hour={hour}");
+            var result = await Http.GetFromJsonAsync<SuggestResponse>($"api/ml/campaigns/suggest?hour={hour}");
             suggestion = result?.Suggestion;
             if (suggestion != null)
                 Snackbar.Add("Yeni kampanya önerisi hazır!", Severity.Info);
@@ -220,8 +219,7 @@
         if (suggestion == null) return;
         try
         {
-            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
-            var response = await client.PostAsJsonAsync("/api/campaigns/activate", suggestion);
+            var response = await Http.PostAsJsonAsync("api/ml/campaigns/activate", suggestion);
             if (response.IsSuccessStatusCode)
             {
                 activeCampaign = suggestion;
@@ -239,8 +237,7 @@
     {
         try
         {
-            using HttpClient client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5001") };
-            var response = await client.PostAsync("/api/campaigns/deactivate", null);
+            var response = await Http.PostAsync("api/ml/campaigns/deactivate", null);
             if (response.IsSuccessStatusCode)
             {
                 campaignHistory.Insert(0, new HistoryItem($"⛔ Devre dışı bırakıldı: {activeCampaign?.Title}", DateTime.Now, false));
@@ -256,6 +253,16 @@
 
     private record ActiveResponse(bool Active, CampaignData? Campaign);
     private record SuggestResponse(CampaignData? Suggestion);
-    private record CampaignData(string Id, string Title, string Description, int DiscountPercent, List<string> TargetCategories, string Condition, int Priority, string Color);
+    
+    private class CampaignData {
+        public string Id { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int DiscountPercent { get; set; }
+        public List<string> TargetCategories { get; set; } = new();
+        public string Condition { get; set; } = "";
+        public int Priority { get; set; }
+        public string Color { get; set; } = "";
+    }
     private record HistoryItem(string Text, DateTime Timestamp, bool IsActivation);
 }

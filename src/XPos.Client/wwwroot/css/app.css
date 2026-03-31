@@ -268,3 +268,29 @@ a {
         transform: translateY(0);
     }
 }
+
+/* --- MudBlazor Dialog & UI Fixes --- */
+.mud-overlay {
+    z-index: 1100 !important;
+    background-color: rgba(0, 0, 0, 0.4) !important;
+    backdrop-filter: blur(4px) !important;
+}
+
+.mud-dialog-container {
+    z-index: 1200 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.mud-dialog {
+    z-index: 1300 !important;
+    background: #FFFFFF !important;
+    opacity: 1 !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* AI Sticky Bar Layers */
+.ai-sticky-bar {
+    z-index: 100 !important;
+}

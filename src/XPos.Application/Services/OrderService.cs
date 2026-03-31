@@ -11,6 +11,7 @@ public class OrderService : IOrderService
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IGenericRepository<Table> _tableRepository;
+    private readonly IGenericRepository<Product> _productRepository;
     private readonly IWeatherService _weatherService;
     private readonly double _lat;
     private readonly double _lon;
@@ -18,11 +19,13 @@ public class OrderService : IOrderService
     public OrderService(
         IOrderRepository orderRepository,
         IGenericRepository<Table> tableRepository,
+        IGenericRepository<Product> productRepository,
         IWeatherService weatherService,
         IConfiguration configuration)
     {
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
+        _productRepository = productRepository;
         _weatherService = weatherService;
         _lat = configuration.GetValue<double>("Location:Latitude", 39.9208);
         _lon = configuration.GetValue<double>("Location:Longitude", 32.8541);
@@ -58,6 +61,16 @@ public class OrderService : IOrderService
             .ToList();
 
         Console.WriteLine($"[OrderService] Bulunan aktif sipariş sayısı: {activeOrders.Count}");
+
+        // Stok Kontrolü
+        foreach (var item in createOrderDto.Items)
+        {
+            var product = await _productRepository.GetByIdAsync(item.ProductId);
+            if (product != null && !product.IsAvailable)
+            {
+                throw new InvalidOperationException($"Ürün stokta yok: {product.Name}");
+            }
+        }
 
         if (activeOrders.Any())
         {

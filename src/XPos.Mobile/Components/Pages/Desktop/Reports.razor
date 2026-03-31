@@ -149,7 +149,8 @@ else
             csv += $"{day.Date:yyyy-MM-dd},{day.TotalAmount},{day.OrderCount}\n";
         }
 
-        await JS.InvokeVoidAsync("downloadFile", "satis_raporu.csv", csv);
+        var fileName = $"satis_raporu_{DateTime.Now:yyyy-MM-dd}.csv";
+        await JS.InvokeVoidAsync("downloadFile", fileName, csv);
     }
 }
 

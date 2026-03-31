@@ -34,10 +34,6 @@
                     <MudIcon Icon="@Icons.Material.Filled.Receipt" Style="font-size:20px;" />
                     <span>Siparisler</span>
                 </a>
-                <a class="sidebar-link @(IsActive("/d/kitchen") ? "active" : "")" @onclick='() => Nav.NavigateTo("/d/kitchen")'>
-                    <MudIcon Icon="@Icons.Material.Filled.Kitchen" Style="font-size:20px;" />
-                    <span>Mutfak Paneli</span>
-                </a>
 
                 <div class="nav-section-title" style="margin-top:24px;">YÖNETIM</div>
                 <a class="sidebar-link @(IsActive("/desktop/menu") ? "active" : "")" @onclick='() => Nav.NavigateTo("/desktop/menu")'>
@@ -58,7 +54,15 @@
                 </a>
                 <a class="sidebar-link @(IsActive("/d/reports") ? "active" : "")" @onclick='() => Nav.NavigateTo("/d/reports")'>
                     <MudIcon Icon="@Icons.Material.Filled.BarChart" Style="font-size:20px;" />
-                    <span>Raporlar (Satış)</span>
+                    <span>Raporlar</span>
+                </a>
+                <a class="sidebar-link @(IsActive("/ml/campaigns") ? "active" : "")" @onclick='() => Nav.NavigateTo("/ml/campaigns")'>
+                    <MudIcon Icon="@Icons.Material.Filled.Campaign" Style="font-size:20px;" />
+                    <span>Kampanyalar</span>
+                </a>
+                <a class="sidebar-link @(IsActive("/ml/forecast") ? "active" : "")" @onclick='() => Nav.NavigateTo("/ml/forecast")'>
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Style="font-size:20px;" />
+                    <span>Satış Tahmin</span>
                 </a>
             </div>
         </nav>

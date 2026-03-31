@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "tetikleyici": "Patates Kızartması",
+    "oneri": "Kola / Fanta / Sprite",
+    "confidence": 0.946,
+    "lift": 5.54,
+    "support": 0.094,
+    "oneri_metni": "'Patates Kızartması' ile birlikte 'Kola / Fanta / Sprite' de ekleyin? (%94 müşteri tercih etti)"
+  },
+  {
+    "tetikleyici": "Hızlı Kahvaltı Tabağı",
+    "oneri": "Sıcak Çay",
+    "confidence": 1.0,
+    "lift": 4.26,
+    "support": 0.058,
+    "oneri_metni": "'Hızlı Kahvaltı Tabağı' ile birlikte 'Sıcak Çay' de ekleyin? (%100 müşteri tercih etti)"
+  },
+  {
+    "tetikleyici": "Menemen",
+    "oneri": "Sıcak Çay",
+    "confidence": 1.0,
+    "lift": 4.26,
+    "support": 0.051,
+    "oneri_metni": "'Menemen' ile birlikte 'Sıcak Çay' de ekleyin? (%100 müşteri tercih etti)"
+  }
+]

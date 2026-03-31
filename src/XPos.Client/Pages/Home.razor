@@ -96,7 +96,7 @@ else
                     <div class="product-grid">
                         @foreach (var product in catProducts)
                         {
-                            <div class="product-card" @onclick="() => OpenProductDetail(product)">
+                            <div class='product-card @(!product.IsAvailable ? "out-of-stock" : "")' @onclick="() => { if(product.IsAvailable) OpenProductDetail(product); }">
                                 <div class="card-image-wrapper">
                                     @if (!string.IsNullOrEmpty(product.ImageUrl))
                                     {
@@ -109,15 +109,35 @@ else
                                         </div>
                                     }
                                     <div class="card-image-overlay"></div>
+                                    @if (!product.IsAvailable)
+                                    {
+                                        <div class="out-of-stock-overlay">
+                                            <div class="out-of-stock-text">TÜKENDİ</div>
+                                        </div>
+                                    }
                                     <div class="card-price-badge">₺@product.Price.ToString("N0")</div>
                                 </div>
                                 <div class="card-body">
                                     <h3 class="card-title">@product.Name</h3>
+                                    @if (IsProductInCampaign(product))
+                                    {
+                                        <div class="product-campaign-tag">🚀 @(activeCampaignBanner?.Title ?? "Kampanya")</div>
+                                    }
                                     <p class="card-desc">@product.Description</p>
-                                    <button class="card-add-btn" @onclick:stopPropagation="true" @onclick="() => QuickAdd(product)">
-                                        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />
-                                        <span>Ekle</span>
-                                    </button>
+                                    @if (product.IsAvailable)
+                                    {
+                                        <button class="card-add-btn" @onclick:stopPropagation="true" @onclick="() => QuickAdd(product)">
+                                            <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />
+                                            <span>Ekle</span>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="card-add-btn disabled" disabled @onclick:stopPropagation="true">
+                                            <MudIcon Icon="@Icons.Material.Filled.Block" Size="Size.Small" />
+                                            <span>Bitti</span>
+                                        </button>
+                                    }
                                 </div>
                             </div>
                         }
@@ -246,6 +266,13 @@ else
         transform: translateY(-6px); 
         box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
     }
+    .product-card.out-of-stock {
+        opacity: 0.6;
+        cursor: not-allowed;
+        filter: grayscale(0.5);
+        pointer-events: none;
+    }
+    .product-card.out-of-stock * { pointer-events: none; }
 
     .card-image-wrapper { 
         position: relative; width: 100%; aspect-ratio: 1; overflow: hidden;
@@ -276,7 +303,7 @@ else
 
     /* ── AI Sticky Bar ── */
     .ai-sticky-bar { 
-        position: fixed; bottom: 24px; left: 0; right: 0; z-index: 999;
+        position: fixed; bottom: 24px; left: 0; right: 0; 
         display: flex; justify-content: center; pointer-events: none;
     }
     .ai-sticky-btn {
@@ -298,6 +325,32 @@ else
     @@keyframes aiGlow {
         0%, 100% { box-shadow: 0 6px 20px rgba(139,92,246,0.35); }
         50% { box-shadow: 0 6px 28px rgba(139,92,246,0.55); }
+    }
+
+    .card-add-btn.disabled {
+        background: #F3F4F6 !important;
+        color: #9CA3AF !important;
+        cursor: not-allowed;
+    }
+
+    .out-of-stock-overlay {
+        position: absolute; inset: 0;
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: grayscale(1);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 5;
+    }
+
+    .out-of-stock-text {
+        background: #F43F5E; color: white; padding: 4px 12px;
+        font-weight: 800; font-size: 0.8rem; border-radius: 6px;
+        transform: rotate(-10deg); border: 2px solid white;
+    }
+
+    .product-campaign-tag {
+        font-size: 0.7rem; font-weight: 800; color: #FF5500;
+        background: rgba(255,85,0,0.1); padding: 2px 8px; border-radius: 6px;
+        margin-bottom: 6px; display: inline-block;
     }
 
     /* ── Responsive ── */
@@ -350,15 +403,27 @@ else
             isLoading = false;
         }
 
-        // Load active campaign
+        // Load active campaign (fallback to suggest)
         try
         {
             var cResult = await Http.GetFromJsonAsync<ActiveCampaignResponse>("api/ml/campaigns/active");
             if (cResult?.Active == true && cResult.Campaign != null)
+            {
                 activeCampaignBanner = cResult.Campaign;
+            }
+            else
+            {
+                var suggestResult = await Http.GetFromJsonAsync<SuggestedCampaignResponse>("api/ml/campaigns/suggest");
+                if (suggestResult?.Suggestion != null)
+                {
+                    activeCampaignBanner = suggestResult.Suggestion;
+                }
+            }
         }
         catch { /* ML down — no banner */ }
     }
+
+    private record SuggestedCampaignResponse(CampaignInfo? Suggestion);
 
     private record ActiveCampaignResponse(bool Active, CampaignInfo? Campaign);
     private record CampaignInfo(string Id, string Title, string Description, int DiscountPercent, List<string> TargetCategories, string Condition, int Priority, string Color);
@@ -409,9 +474,21 @@ else
         await JSRuntime.InvokeVoidAsync("scrollToElement", "cat-" + categoryId);
     }
 
-    private void QuickAdd(ProductDto product)
+    private async Task QuickAdd(ProductDto product)
     {
         CartService.AddToCart(product);
+        if (IsProductInCampaign(product))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"🚀 Kampanya Uygulandı!\n{product.Name} ürünü '{activeCampaignBanner?.Title}' kapsamında sepete eklendi.");
+        }
+    }
+
+    private bool IsProductInCampaign(ProductDto product)
+    {
+        if (activeCampaignBanner == null) return false;
+        var cat = categories.FirstOrDefault(c => c.Id == product.CategoryId);
+        if (cat == null) return false;
+        return activeCampaignBanner.TargetCategories.Any(t => cat.Name.Contains(t, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task OpenProductDetail(ProductDto product)

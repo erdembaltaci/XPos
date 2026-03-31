@@ -34,6 +34,7 @@
                     <th>Ürün Adı</th>
                     <th>Kategori</th>
                     <th>Fiyat</th>
+                    <th>Stok Durumu</th>
                 </tr>
             </thead>
             <tbody>
@@ -44,6 +45,13 @@
                         <td class="fw-600">@p.Name</td>
                         <td><span class="dp-cat-chip">@GetCategoryName(p.CategoryId)</span></td>
                         <td class="fw-600" style="color:#1677FF;">@p.Price.ToString("N2") ₺</td>
+                        <td>
+                            <MudSwitch Value="@p.IsAvailable" T="bool" Color="Color.Success" 
+                                       ValueChanged="@((bool b) => { p.IsAvailable = b; ToggleStock(p); })"
+                                       UnCheckedColor="Color.Error" ThumbIcon="@(p.IsAvailable ? Icons.Material.Filled.Check : Icons.Material.Filled.Block)">
+                                @(p.IsAvailable ? "Stokta Var" : "Tükendi")
+                            </MudSwitch>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -117,4 +125,17 @@
     }
 
     private string GetCategoryName(int id) => categories.FirstOrDefault(c => c.Id == id)?.Name ?? "-";
+
+    private async Task ToggleStock(ProductDto p)
+    {
+        // Toggle happens via @bind-Value, but we need to save it
+        try
+        {
+            await Http.PutAsJsonAsync($"api/products/{p.Id}", p);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
 }

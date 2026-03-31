@@ -26,7 +26,8 @@ public class ProductService : IProductService
             Price = p.Price,
             ImageUrl = p.ImageUrl,
             CategoryId = p.CategoryId,
-            IsActive = p.IsActive
+            IsActive = p.IsActive,
+            IsAvailable = p.IsAvailable
         });
     }
 
@@ -43,7 +44,8 @@ public class ProductService : IProductService
             Price = product.Price,
             ImageUrl = product.ImageUrl,
             CategoryId = product.CategoryId,
-            IsActive = product.IsActive
+            IsActive = product.IsActive,
+            IsAvailable = product.IsAvailable
         };
     }
 
@@ -56,7 +58,8 @@ public class ProductService : IProductService
             Price = productDto.Price,
             ImageUrl = productDto.ImageUrl,
             CategoryId = productDto.CategoryId,
-            IsActive = productDto.IsActive
+            IsActive = productDto.IsActive,
+            IsAvailable = productDto.IsAvailable
         };
 
         await _productRepository.AddAsync(product);
@@ -75,6 +78,7 @@ public class ProductService : IProductService
             product.ImageUrl = productDto.ImageUrl;
             product.CategoryId = productDto.CategoryId;
             product.IsActive = productDto.IsActive;
+            product.IsAvailable = productDto.IsAvailable;
 
             await _productRepository.UpdateAsync(product);
         }

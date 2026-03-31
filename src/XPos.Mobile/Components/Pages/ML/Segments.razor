@@ -1,5 +1,6 @@
 @page "/ml/segments"
 
+@using System.Text.Json.Serialization
 @inject ISnackbar Snackbar
 
 <div class="d-flex justify-space-between align-center mb-4">
@@ -103,12 +104,26 @@
         _ => Icons.Material.Filled.Person
     };
 
-    private record SegmentResponse(List<SegmentInfo> Segments, int TotalOrders, int SegmentCount);
+    private record SegmentResponse(
+        [property: JsonPropertyName("segments")] List<SegmentInfo> Segments, 
+        [property: JsonPropertyName("total_orders")] int TotalOrders, 
+        [property: JsonPropertyName("segment_count")] int SegmentCount
+    );
+
     private record SegmentInfo(
-        int Id, string Name, string Color, string Icon, string Description,
-        int CustomerCount, double Percentage, decimal AvgSpend,
-        double AvgGroupSize, double AvgItems, decimal TotalRevenue,
-        double WeekendRatio, int PeakHour
+        [property: JsonPropertyName("id")] int Id, 
+        [property: JsonPropertyName("name")] string Name, 
+        [property: JsonPropertyName("color")] string Color, 
+        [property: JsonPropertyName("icon")] string Icon, 
+        [property: JsonPropertyName("description")] string Description,
+        [property: JsonPropertyName("customer_count")] int CustomerCount, 
+        [property: JsonPropertyName("percentage")] double Percentage, 
+        [property: JsonPropertyName("avg_spend")] decimal AvgSpend,
+        [property: JsonPropertyName("avg_group_size")] double AvgGroupSize, 
+        [property: JsonPropertyName("avg_items")] double AvgItems, 
+        [property: JsonPropertyName("total_revenue")] decimal TotalRevenue,
+        [property: JsonPropertyName("weekend_ratio")] double WeekendRatio, 
+        [property: JsonPropertyName("peak_hour")] int PeakHour
     )
     {
         public int Count => CustomerCount;

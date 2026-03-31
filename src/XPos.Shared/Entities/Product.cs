@@ -10,4 +10,5 @@ public class Product
     public int CategoryId { get; set; }
     public virtual Category? Category { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool IsAvailable { get; set; } = true;
 }

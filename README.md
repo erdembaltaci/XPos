@@ -1,4 +1,4 @@
-# XPos – AI Destekli Restoran POS Sistemi
+# XPos – AI Destekli Restoran POS Ekosistemi
 
 Modern restoranlar için geliştirilmiş, uçtan uca tam yönetim çözümü. QR kod tabanlı müşteri menüsü, makine öğrenmesi destekli öneri motoru, gerçek zamanlı sipariş takibi ve kapsamlı yönetim paneliyle donatılmıştır.
 
@@ -6,159 +6,117 @@ Modern restoranlar için geliştirilmiş, uçtan uca tam yönetim çözümü. QR
 
 ## 🏗️ Mimari Genel Bakış
 
-Proje **Clean Architecture** prensiplerine dayalı olarak katmanlı bir yapıda geliştirilmiştir:
+Proje **Clean Architecture** prensiplerine dayalı olarak katmanlı bir yapıda geliştirilmiştir. Backend, Frontend ve Yapay Zeka bileşenleri birbirleriyle REST API ve SignalR üzerinden haberleşir.
 
+### 📊 Sistem Mimarisi
+```mermaid
+graph TD
+    subgraph "Frontend Katmanı"
+        A[QR Menü - Blazor WASM]
+        B[Yönetim Paneli - MAUI Hybrid]
+        C[Mutfak Ekranı - MAUI Hybrid]
+    end
+
+    subgraph "Backend Katmanı (.NET 9)"
+        D[WebAPI - ASP.NET Core]
+        E[SignalR Hub - Realtime]
+        F[(SQLite DB)]
+    end
+
+    subgraph "AI/ML Mikroservis (Python)"
+        G[FastAPI Service]
+        H[Apriori - Öneriler]
+        I[K-Means - Segmentasyon]
+        J[Forecast - Satış Tahmini]
+    end
+
+    A <--> D
+    B <--> D
+    D <--> E
+    D <--> G
+    G <--> F
+    D <--> F
 ```
-XPos/
-├── src/
-│   ├── XPos.Domain/          → Temel varlıklar (Entity) ve iş kuralları
-│   ├── XPos.Application/     → Servis arayüzleri (Interface) ve use-case işlemleri
-│   ├── XPos.Infrastructure/  → EF Core, SQLite, veri erişim katmanı
-│   ├── XPos.WebAPI/          → ASP.NET Core REST API + SignalR Hub
-│   ├── XPos.Client/          → Blazor WebAssembly müşteri menüsü
-│   ├── XPos.Mobile/          → MAUI Blazor Hybrid yönetim uygulaması
-│   ├── XPos.Shared/          → Paylaşılan DTO ve modeller
-│   └── XPos.ML/              → Python FastAPI yapay zeka servisi
-└── ml_data/                  → Apriori eğitim verileri ve öneri JSON dosyası
+
+---
+
+## ⚙️ Bileşenler ve Teknolojiler
+
+### 1. 🌐 QR Menü (XPos.Client)
+Müşterilerin masalarındaki QR kodu okutarak eriştikleri self-servis arayüzdür.
+- **AI Lezzet Sihirbazı:** Sepete eklenen ürünlere göre gerçek zamanlı "Yanında iyi gider" önerileri sunar.
+- **Dinamik Kampanyalar:** Hava durumu ve saate göre değişen aktif fırsatları gösterir.
+- **Teknoloji:** Blazor WebAssembly, MudBlazor, SignalR.
+
+### 2. 🖥️ Yönetim & Mutfak (XPos.Mobile)
+Restoran sahibinin ve mutfak ekibinin kullandığı ana kontrol merkezidir.
+- **Dashboard:** Günlük ciro, masa doluluk ve anlık sipariş takibi.
+- **Müşteri Segmentasyonu:** K-Means algoritması ile müşterileri "Premium", "Hızlı Öğle", "Sosyal Grup" gibi davranışsal sınıflara ayırır.
+- **Teknoloji:** .NET MAUI (Windows & Android), Blazor Hybrid.
+
+### 3. 🧠 AI Mikroservis (XPos.ML)
+Sistemin beyni olan Python tabanlı servistir.
+- **Apriori Algorithm:** Milyonlarca satır veriyi analiz ederek ürünler arası gizli korelasyonları bulur.
+- **Sales Forecast:** Geçmiş verilere ve hava durumuna bakarak gelecek 7-30 günün cirosunu tahmin eder.
+- **Teknoloji:** FastAPI, Pandas, Scikit-learn, Mlxtend.
+
+---
+
+## 🔄 Sipariş Akış Diyagramı
+
+```mermaid
+sequenceDiagram
+    participant M as Müşteri (QR Menü)
+    participant A as ASP.NET WebAPI
+    participant S as SignalR Hub
+    participant Y as Yönetim / Mutfak
+    participant AI as Python ML Service
+
+    M->>AI: Akıllı Öneri İste (Sepet Bazlı)
+    AI-->>M: Önerilen Ürünler (Apriori)
+    M->>A: Yeni Sipariş Gönder
+    A->>F: DB Kaydet
+    A->>S: Sipariş Bildirimi (Broadcast)
+    S-->>Y: Anlık Sipariş Ekranına Düş
+    Y->>A: Durum Güncelle (Hazırlanıyor/Hazır)
+    A->>S: Müşteriye Bildir
+    S-->>M: "Siparişiniz Hazırlanıyor"
 ```
 
 ---
 
-## ✨ Özellikler
-
-### 🖥️ Yönetim Uygulaması (`XPos.Mobile` – MAUI Blazor Hybrid)
-- **Dashboard** – Günlük ciro, sipariş sayısı, masa doluluk oranı; yapay zeka kampanya önerileri
-
-> **Not:** `XPos.Mobile` hem Windows masaüstü hem Android olarak çalışır. Hedef platforma göre farklı komut kullanılır (bkz. Kurulum).
-- **Sipariş Takibi** – SignalR ile gerçek zamanlı sipariş akışı
-- **Masa Yönetimi** – Masa durumu, token tabanlı güvenli QR kod üretimi ve yazdırma
-- **Menü Yönetimi** – Ürün/kategori CRUD, fotoğraf yükleme (Base64), anlık arama
-- **Raporlar** – Gelir grafikleri, en çok satan ürünler
-- **AI Önerileri** – Ürün bazlı akıllı öneri paneli (Apriori + kategori kuralları)
-- **Personel Yönetimi** – Garson/kasiyer hesap yönetimi
-
-### 🌐 Müşteri Menüsü (`XPos.Client` – Blazor WebAssembly)
-- QR kod ile masa bazlı erişim (token doğrulaması)
-- Kategori filtreli dijital menü
-- Sepet yönetimi, sipariş gönderme
-- **AI Lezzet Sihirbazı** – Sepet içeriğine göre akıllı ürün önerileri
-- Aktif kampanya bildirimi (indirim/fırsat)
-- Karanlık/Aydınlık mod desteği
-
-### 🔙 Backend (`XPos.WebAPI` – ASP.NET Core .NET 9)
-- RESTful API, JWT kimlik doğrulama ve yetkilendirme
-- **SignalR** (`/orderHub`) ile anlık sipariş bildirimleri
-- EF Core + SQLite (`XPosDb_v3.sqlite`) ile veri yönetimi
-- Swagger UI (geliştirme ortamında otomatik açılır)
-
-**Mevcut Controller'lar:**
-| Controller | Açıklama |
-|---|---|
-| `AuthController` | Staff girişi, JWT token üretimi |
-| `OrdersController` | Sipariş oluşturma, güncelleme, listeleme |
-| `ProductsController` | Menü ürün yönetimi |
-| `CategoriesController` | Kategori yönetimi |
-| `TablesController` | Masa yönetimi, QR token |
-| `ReportsController` | Satış raporları |
-| `StaffController` | Personel yönetimi |
-| `StationController` | İstasyon/kasa ayarları |
-| `MlController` | AI servisine proxy uç noktaları |
-
-### 🤖 Yapay Zeka Servisi (`XPos.ML` – Python FastAPI)
-Bağımsız bir mikroservis olarak **port 5001**'de çalışır. Doğrudan SQLite veritabanını okuyarak gerçek zamanlı analiz yapar.
-
-| Endpoint | Yöntem | Açıklama |
-|---|---|---|
-| `GET /` | – | Servis durumu |
-| `GET /api/recommendations` | Ürün bazlı | Apriori ilişkilendirme kuralları |
-| `GET /api/recommendations/basket` | Sepet bazlı | Çoklu ürün öneri motoru |
-| `POST /api/recommendations/smart-basket` | Akıllı sepet | Kategori + Apriori hibrit öneri |
-| `POST /api/recommendations/dashboard` | Dashboard | Yönetim paneli ürün önerileri |
-| `POST /api/recommendations/retrain` | – | Modeli yeniden eğit |
-| `GET /api/forecast` | Satış tahmini | Lineer regresyon (1-90 gün) |
-| `POST /api/forecast/retrain` | – | Tahmin modelini yeniden eğit |
-| `GET /api/campaigns` | Kampanya | Hava/saat bazlı dinamik kampanyalar |
-| `GET /api/campaigns/suggest` | Öneri | En iyi kampanyayı öner |
-| `POST /api/campaigns/activate` | Aktivasyon | Kampanya yayınla |
-| `GET /api/campaigns/active` | Aktif | Mevcut kampanyayı getir |
-| `GET /api/segments` | Segmentasyon | K-Means müşteri segmentleri |
-| `GET /api/stats` | İstatistik | ML model özeti |
-
----
-
-## �️ Teknoloji Yığını
-
-| Teknoloji | Kullanım Alanı |
-|---|---|
-| **.NET 9** | Temel framework |
-| **MAUI Blazor Hybrid** | Cross-platform yönetim uygulaması (Windows + Android) |
-| **Blazor WebAssembly** | Müşteri web menüsü |
-| **ASP.NET Core WebAPI** | RESTful backend |
-| **SignalR** | Gerçek zamanlı sipariş bildirimleri |
-| **Entity Framework Core** | SQLite ORM |
-| **JWT Bearer** | Kimlik doğrulama ve yetkilendirme |
-| **MudBlazor** | Material Design UI bileşen kütüphanesi |
-| **Python + FastAPI** | Yapay zeka mikroservisi |
-| **Pandas + MLxtend** | Apriori, tahmin ve segmentasyon modelleri |
-| **SQLite** | Yerleşik veritabanı (`XPosDb_v3.sqlite`) |
-
----
-
-## ▶️ Kurulum ve Çalıştırma
+## 🚀 Kurulum ve Başlatma
 
 ### Ön Gereksinimler
-- [.NET 9 SDK](https://dotnet.microsoft.com/download)
-- [Python 3.10+](https://www.python.org/)
-- Windows 10/11 (MAUI Desktop için)
+- **.NET 9 SDK**
+- **Python 3.10+** (FastAPI ve gerekli kütüphaneler)
+- **Windows 10/11** (MAUI Desktop için)
 
-### 1. Python AI Servisini Kurun
-```bash
-cd src/XPos.ML
-pip install -r requirements.txt
-```
-
-### 2. Tüm Bileşenleri Tek Seferde Başlatın
-Proje kökünde `RunApps.ps1` betiği mevcuttur; API, Client ve ML servisini paralel başlatır:
+### Hızlı Başlat (Önerilen)
+Proje kökünde bulunan `RunApps.ps1` betiği tüm bileşenleri (API, Client, ML) tek seferde ayağa kaldırır:
 ```powershell
 .\RunApps.ps1
 ```
 
-### 3. Manuel Başlatma (Bileşen Bazlı)
+### Manuel Kurulum
 
-**API (Port 5029):**
+**1. Python AI Servisi:**
+```bash
+cd src/XPos.ML
+pip install -r requirements.txt
+uvicorn app:app --port 5001 --reload
+```
+
+**2. Backend API:**
 ```bash
 cd src/XPos.WebAPI
 dotnet run
 ```
 
-**Müşteri Web Menüsü:**
-```bash
-cd src/XPos.Client
-dotnet run
-```
-
-**Yapay Zeka Servisi (Port 5001):**
-```bash
-cd src/XPos.ML
-uvicorn app:app --port 5001 --reload
-```
-
-**Masaüstü Yönetim Uygulaması (Windows Desktop):**
+**3. Yönetim Paneli (MAUI):**
 ```bash
 cd src/XPos.Mobile
 dotnet run -f net9.0-windows10.0.19041.0
-```
-
-**Mobil Yönetim Uygulaması (Android – Emülatör veya Fiziksel Cihaz):**
-```bash
-cd src/XPos.Mobile
-dotnet run -f net9.0-android
-```
-
-### 4. ML Modelini Eğitin (İlk Kullanım)
-```bash
-cd ml_data
-python apriori_train.py
 ```
 
 ---
@@ -167,21 +125,16 @@ python apriori_train.py
 
 | Servis | Adres |
 |---|---|
-| XPos.WebAPI | `http://localhost:5029` |
-| XPos.Client | `http://localhost:5030` (veya otomatik) |
-| XPos.ML | `http://localhost:5001` |
-| Swagger UI | `http://localhost:5029/swagger` |
+| **WebAPI** | `http://localhost:5029` |
+| **QR Client** | `http://localhost:5030` |
+| **ML Service** | `http://localhost:5001` |
+| **Swagger** | `http://localhost:5029/swagger` |
 
 ---
 
-## 💳 Ödeme Sistemi Altyapısı
-
-Ödeme şu an manuel olarak işaretlenmektedir. Fiziksel POS entegrasyonu için mimari hazırdır:
-
-- **GMP3 / Kablolu**: RS232/USB üzerinden POS'a tutar gönderimi
-- **Android POS (App-to-App)**: Intent yöntemiyle banka uygulamasına yönlendirme
-- **SoftPOS / API**: NFC özellikli cihaz üzerinden temassız ödeme bulut entegrasyonu
+## 💳 Ödeme Sistemi Entegrasyonu (Gelecek Vizyonu)
+Mevcut yapı, fiziksel POS (RS232/IP) ve SoftPOS entegrasyonlarına uygun şekilde soyutlanmıştır. `PaymentService` üzerinden banka entegrasyonları kolayca genişletilebilir.
 
 ---
 
-*Geliştirici Notu: Bu proje aktif geliştirme aşamasındadır.*
+*Geliştirici Notu: AI modelleri her 3000 siparişte bir veya manuel tetikleme ile otomatik olarak yeniden eğitilmektedir.*

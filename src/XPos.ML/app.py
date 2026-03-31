@@ -301,6 +301,27 @@ def smart_basket_recommendations(req: SmartBasketRequest):
     print(f"\n🔍 AI DEBUG: Sepet Önerisi İsteği Alındı")
     print(f"   Sepetteki Ürünler: {[p.name for p in req.cart_products]}")
     
+    from campaign_engine import get_top_campaign
+    top_campaign = _load_active_campaign()
+    if not top_campaign:
+        # Fallback to smart suggestion if no manual campaign active
+        top_campaign = get_top_campaign()
+    
+    campaign_target_cats = top_campaign.get("hedef_kategoriler", []) if top_campaign else []
+    # Map category names to IDs if needed. Common names:
+    # 1: Başlangıç, 2: Salata, 3: Burger, 4: Pizza, 5: Ana Yemek, 6: Makarna, 7: İçecek, 8: Tatlı, 9: Kahvaltı
+    CAT_NAME_TO_ID = {
+        "Başlangıç": 1, "Salata": 2, "Burger": 3, "Pizza": 4, "Ana Yemek": 5, 
+        "Makarna": 6, "İçecek": 7, "Tatlı": 8, "Kahvaltı": 9,
+        "Çorba": 1, "Hamur İşi": 6, "Kebap": 5,
+        "İçecek - Soğuk": 7, "İçecek - Sıcak": 7
+    }
+    target_ids = []
+    for cat_name in campaign_target_cats:
+        for key, val in CAT_NAME_TO_ID.items():
+            if key.lower() in cat_name.lower():
+                target_ids.append(val)
+
     """
     Smart cart-aware recommendations using:
     1. Category-based complementary matching (primary)
@@ -427,13 +448,17 @@ def smart_basket_recommendations(req: SmartBasketRequest):
         max_score = sorted_items[0]["score"] if sorted_items else 1
         norm_conf = min(0.95, max(0.50, item["score"] / max(max_score, 0.01) * 0.95))
 
+        has_campaign = cat in target_ids
+        
         result.append({
             "ProductId": item["product"].id,
             "Name": item["product"].name,
             "Price": item["product"].price,
             "CategoryId": item["product"].categoryId,
             "Confidence": round(norm_conf, 2),
-            "Reason": item["reasons"][0] if item["reasons"] else "popular"
+            "Reason": item["reasons"][0] if item["reasons"] else "popular",
+            "HasCampaign": has_campaign,
+            "CampaignTitle": top_campaign.get("baslik") if has_campaign and top_campaign else None
         })
 
         if len(result) >= req.limit:

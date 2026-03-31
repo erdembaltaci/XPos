@@ -107,6 +107,12 @@
                                     @(GetCategoryEmoji(reco.Name))
                                 </div>
                                 <span class="ai-reco-card-name">@reco.Name</span>
+                                @if (reco.HasCampaign)
+                                {
+                                    <div class="ai-reco-campaign-tag">
+                                        🚀 @(reco.CampaignTitle ?? "İndirim")
+                                    </div>
+                                }
                                 @if (reco.Price > 0)
                                 {
                                     <span class="ai-reco-card-price">+₺@reco.Price.ToString("N0")</span>
@@ -397,6 +403,20 @@
         padding: 1px 8px;
         border-radius: 8px;
     }
+    .ai-reco-campaign-tag {
+        font-size: 0.65rem;
+        font-weight: 800;
+        background: #FF5500;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 6px;
+        margin-bottom: 2px;
+        animation: pulse-small 2s infinite;
+    }
+    @@keyframes pulse-small {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
 </style>
 
 @code {
@@ -416,8 +436,9 @@
     private List<CategoryDto> categories = new();
     private decimal campaignDiscount => CalculateDiscount();
 
-    private record RecoItem(int ProductId, string Name, decimal Price, double Confidence);
+    private record RecoItem(int ProductId, string Name, decimal Price, double Confidence, bool HasCampaign, string? CampaignTitle);
     private record ActiveCampaignResponse(bool Active, CampaignInfo? Campaign);
+    private record SuggestedCampaignResponse(CampaignInfo? Suggestion);
     private record CampaignInfo(string Id, string Title, string Description, decimal DiscountPercent, List<string> TargetCategories);
 
     protected override async Task OnInitializedAsync()
@@ -472,11 +493,23 @@
         try { categories = await Http.GetFromJsonAsync<List<CategoryDto>>("api/categories") ?? new(); }
         catch { }
 
-        // Load active campaign
+        // Load active campaign (fallback to suggest if none active)
         try
         {
             var campResp = await Http.GetFromJsonAsync<ActiveCampaignResponse>("api/ml/campaigns/active");
-            activeCampaign = campResp is { Active: true, Campaign: not null } ? campResp.Campaign : null;
+            if (campResp is { Active: true, Campaign: not null })
+            {
+                activeCampaign = campResp.Campaign;
+            }
+            else
+            {
+                // Try suggested campaign
+                var suggestResp = await Http.GetFromJsonAsync<SuggestedCampaignResponse>("api/ml/campaigns/suggest");
+                if (suggestResp?.Suggestion != null)
+                {
+                    activeCampaign = suggestResp.Suggestion;
+                }
+            }
         }
         catch { activeCampaign = null; }
 
@@ -519,7 +552,7 @@
                     var cartIds = CartService.Items.Select(i => i.Product.Id).ToHashSet();
                     aiRecommendations = result.Recommendations
                         .Where(r => !cartIds.Contains(r.ProductId))
-                        .Select(r => new RecoItem(r.ProductId, r.Name, (decimal)r.Price, r.Confidence))
+                        .Select(r => new RecoItem(r.ProductId, r.Name, (decimal)r.Price, r.Confidence, r.HasCampaign, r.CampaignTitle))
                         .ToList();
                 }
                 else
@@ -536,7 +569,7 @@
         finally { isLoadingReco = false; StateHasChanged(); }
     }
 
-    private void AddRecommendation(RecoItem reco)
+    private async Task AddRecommendation(RecoItem reco)
     {
         // Match by product ID (guaranteed accurate)
         var product = allProducts.FirstOrDefault(p => p.Id == reco.ProductId);
@@ -552,6 +585,13 @@
             _skipRecoRefresh = true;
             CartService.AddToCart(product);
             _skipRecoRefresh = false;
+
+            if (reco.HasCampaign)
+            {
+                // Simple alert fallback for snackbar
+                await JS.InvokeVoidAsync("alert", $"🎉 Kampanya Uygulandı!\n{reco.Name} ürünü {reco.CampaignTitle} kapsamında sepete eklendi.");
+            }
+
             // Remove from displayed list immediately
             aiRecommendations = aiRecommendations.Where(r => r.ProductId != reco.ProductId).ToList();
             StateHasChanged();
@@ -675,5 +715,5 @@
 
     // DTO for ML smart response
     private record SmartRecoResponse(List<SmartRecoItem> Recommendations, int Count);
-    private record SmartRecoItem(int ProductId, string Name, double Price, int CategoryId, double Confidence, string Reason);
+    private record SmartRecoItem(int ProductId, string Name, double Price, int CategoryId, double Confidence, string Reason, bool HasCampaign, string? CampaignTitle);
 }

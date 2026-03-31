@@ -123,11 +123,11 @@ else
                 </a>
                 <a class="quick-link" @onclick='() => Nav.NavigateTo("/ml/forecast")'>
                     <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Style="font-size:20px; color:#7C3AED;" />
-                    <span>AI Tahmin</span>
+                    <span>Satış Tahmin</span>
                 </a>
                 <a class="quick-link" @onclick='() => Nav.NavigateTo("/ml/segments")'>
                     <MudIcon Icon="@Icons.Material.Filled.Groups" Style="font-size:20px; color:#EC4899;" />
-                    <span>Segmentler</span>
+                    <span>Müşteri Segmentleri (AI)</span>
                 </a>
             </div>
         </div>
@@ -212,7 +212,7 @@ else
         }
         catch { }
 
-        // AI kampanya
+        // AI kampanya (Active -> Suggest fallback)
         try
         {
             var activeResult = await Http.GetFromJsonAsync<ActiveCampaignResponse>("api/ml/campaigns/active");
@@ -222,11 +222,22 @@ else
             }
             else
             {
-                aiCampaign = "Aktif kampanya yok";
+                // Try suggestion
+                var suggest = await Http.GetFromJsonAsync<SuggestedCampaignResponse>("api/ml/campaigns/suggest");
+                if (suggest?.Suggestion != null)
+                {
+                    aiCampaign = $"✨ {suggest.Suggestion.Title}";
+                }
+                else
+                {
+                    aiCampaign = "Aktif kampanya yok";
+                }
             }
         }
         catch { aiCampaign = "ML servis bağlantısı yok"; }
     }
+
+    private record SuggestedCampaignResponse(CampaignItem? Suggestion);
 
     private string GetChipClass(OrderStatus s) => s switch
     {
