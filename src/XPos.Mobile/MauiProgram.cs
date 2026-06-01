@@ -31,10 +31,12 @@ public static class MauiProgram
 #endif
             
             // HttpClient Configuration
-            // Emülatör: 10.0.2.2, Gerçek cihaz: bilgisayar IP
-            string baseAddress = DeviceInfo.Platform == DevicePlatform.Android ? "http://10.0.2.2:5029" : "http://127.0.0.1:5029";
+            // Emülatör: 10.0.2.2 (Android host loopback), Windows: localhost
+            string baseAddress = DeviceInfo.Platform == DevicePlatform.Android 
+                ? "http://10.0.2.2:5029" 
+                : "http://localhost:5029";
             
-            builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(baseAddress) });
+            builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(baseAddress), Timeout = TimeSpan.FromSeconds(30) });
             builder.Services.AddScoped<Services.AuthStateService>();
             builder.Services.AddSingleton<Services.OrderStateService>();
 

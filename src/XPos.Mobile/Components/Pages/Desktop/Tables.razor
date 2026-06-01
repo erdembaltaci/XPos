@@ -1,6 +1,10 @@
 @page "/d/tables"
+@using XPos.Shared.DTOs
+@using XPos.Shared.Enums
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject XPos.Mobile.Services.OrderStateService OrderState
+@implements IDisposable
 
 <div class="dt-header">
     <h2 class="dt-title">Masalar</h2>
@@ -56,7 +60,14 @@
             </button>
         </div>
 
-        @if (selectedOrder != null)
+        @if (isLoadingOrder)
+        {
+            <div class="dt-empty-detail">
+                <MudProgressCircular Indeterminate="true" Size="Size.Medium" Color="Color.Primary" />
+                <p>Sipariş bilgileri yükleniyor...</p>
+            </div>
+        }
+        else if (selectedOrder != null)
         {
             <div class="dt-detail-status">
                 <span class="status-chip @GetChipClass(selectedOrder.Status)">@GetStatusText(selectedOrder.Status)</span>
@@ -95,21 +106,31 @@
                     <button class="dt-btn reject" @onclick="RejectOrder">Reddet</button>
                     <button class="dt-btn approve" @onclick="ApproveOrder">Onayla</button>
                 }
-                @if (selectedOrder.Status == OrderStatus.Confirmed || selectedOrder.Status == OrderStatus.Preparing || selectedOrder.Status == OrderStatus.Ready)
+                @if (selectedOrder.Status == OrderStatus.Confirmed || 
+                    selectedOrder.Status == OrderStatus.Preparing || 
+                    selectedOrder.Status == OrderStatus.Ready || 
+                    selectedOrder.Status == OrderStatus.Delivered)
                 {
                     <button class="dt-btn pay" @onclick="() => showPayment = true">
-                        <MudIcon Icon="@Icons.Material.Filled.CreditCard" Style="font-size:18px;" /> Ödeme Al
+                        <MudIcon Icon="@Icons.Material.Filled.CreditCard" Style="font-size:18px;" /> @(selectedOrder.PaidAmount > 0 ? "Kalan Ödeme Al" : "Ödeme Al")
                     </button>
                 }
             </div>
 
-            <!-- Payment Section -->
             @if (showPayment)
             {
                 <PaymentDialog Order="selectedOrder" 
                                OnClose="() => showPayment = false" 
                                OnPaymentCompleted="OnPaymentCompleted" />
             }
+        }
+        else if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="dt-empty-detail error">
+                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Style="font-size:40px; color:#EF4444;" />
+                <p>Hata: @errorMessage</p>
+                <button class="dt-btn approve mt-2" @onclick="() => SelectTable(selectedTable!)">Yeniden Dene</button>
+            </div>
         }
         else
         {
@@ -199,13 +220,21 @@
     private List<TableDto> tables = new();
     private List<ProductDto> products = new();
     private bool isLoading = true;
+    private bool isLoadingOrder = false;
+    private string? errorMessage;
     private TableDto? selectedTable;
     private OrderDto? selectedOrder;
     private bool showPayment;
     private decimal paymentAmount;
     private string? payMessage;
 
-    protected override async Task OnInitializedAsync() => await LoadData();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await OrderState.StartConnection();
+        OrderState.OnOrderReceived += HandleOrderReceived;
+        _ = PeriodicRefresh();
+    }
 
     private async Task LoadData()
     {
@@ -221,27 +250,50 @@
 
     private async Task SelectTable(TableDto t)
     {
+        Console.WriteLine($"[Tables] Selecting Table: {t.TableNumber}");
         selectedTable = t;
         selectedOrder = null;
+        isLoadingOrder = true;
+        errorMessage = null;
         showPayment = false;
         payMessage = null;
 
         try
         {
-            var response = await Http.GetAsync($"api/orders/active/{t.TableNumber}");
+            var url = $"api/orders/active/{Uri.EscapeDataString(t.TableNumber.Trim())}";
+            Console.WriteLine($"[Tables] Fetching active order from: {url}");
+            
+            var response = await Http.GetAsync(url);
             if (response.IsSuccessStatusCode)
             {
                 selectedOrder = await response.Content.ReadFromJsonAsync<OrderDto>();
+                Console.WriteLine($"[Tables] Order fetched successfully. ID: {selectedOrder?.Id}, Total: {selectedOrder?.TotalAmount}");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                selectedOrder = null;
+                Console.WriteLine($"[Tables] No active order for table {t.TableNumber}");
             }
             else
             {
-                selectedOrder = null;
+                errorMessage = $"Sunucu hatası: {response.StatusCode}";
+                var error = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[Tables] Error fetching order: {response.StatusCode} - {error}");
             }
 
             if (selectedOrder != null)
                 paymentAmount = selectedOrder.TotalAmount - selectedOrder.PaidAmount;
         }
-        catch { }
+        catch (Exception ex)
+        {
+            errorMessage = $"Bağlantı hatası oluştu: {ex.Message} ({ex.GetType().Name})";
+            Console.WriteLine($"[Tables] Exception in SelectTable: {ex}");
+        }
+        finally
+        {
+            isLoadingOrder = false;
+            StateHasChanged();
+        }
     }
 
     private string GetProductName(int id) => products.FirstOrDefault(p => p.Id == id)?.Name ?? $"Ürün #{id}";
@@ -303,5 +355,33 @@
         showPayment = false;
         await SelectTable(selectedTable!); // Reload order details
         await LoadData(); // Reload table list (status dots)
+    }
+
+    private async Task PeriodicRefresh()
+    {
+        using var timer = new System.Threading.PeriodicTimer(TimeSpan.FromSeconds(5));
+        while (await timer.WaitForNextTickAsync())
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void HandleOrderReceived(OrderDto order)
+    {
+        Console.WriteLine($"[Tables] Real-time order notification received for table {order.TableNumber}");
+        InvokeAsync(async () => 
+        {
+            await LoadData();
+            if (selectedTable != null && selectedTable.TableNumber.Trim() == order.TableNumber.Trim())
+            {
+                await SelectTable(selectedTable);
+            }
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        OrderState.OnOrderReceived -= HandleOrderReceived;
     }
 }

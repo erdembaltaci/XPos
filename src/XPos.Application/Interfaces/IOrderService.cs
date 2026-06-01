@@ -14,4 +14,5 @@ public interface IOrderService
     Task AddPaymentAsync(int id, decimal amount);
     Task PayOrderItemsAsync(int orderId, List<int> orderItemIds);
     Task<OrderDto?> GetActiveOrderForTableAsync(string tableNumber);
+    Task<OrderDto?> GetOrderByItemIdAsync(int orderItemId);
 }

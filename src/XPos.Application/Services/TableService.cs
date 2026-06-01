@@ -20,17 +20,28 @@ public class TableService : ITableService
     public async Task<IEnumerable<TableDto>> GetAllTablesAsync()
     {
         var tables = await _tableRepository.GetAllAsync();
-        var activeOrders = await _orderRepository.FindAsync(o => o.Status != OrderStatus.Paid && o.Status != OrderStatus.Cancelled);
         
-        return tables.Select(t => 
+        // Tüm aktif siparişleri tek sorguda çek, sonra Dictionary ile O(1) lookup yap
+        // (RAM'de her masa için tekrar tekrar Where() çalıştırmak yerine)
+        var activeOrders = await _orderRepository.FindAsync(
+            o => o.Status != OrderStatus.Paid && o.Status != OrderStatus.Cancelled);
+        
+        // TableNumber bazlı hızlı grupla
+        var ordersByTable = activeOrders
+            .GroupBy(o => o.TableNumber.Trim())
+            .ToDictionary(g => g.Key, g => g.ToList());
+        
+        return tables.Select(t =>
         {
-            var tableOrders = activeOrders.Where(o => o.TableNumber == t.TableNumber).ToList();
-            
-            // Eğer birden fazla aktif sipariş varsa, bunları toplam olarak göster
-            var hasActive = tableOrders.Any();
+            var key = t.TableNumber.Trim();
+            var tableOrders = ordersByTable.TryGetValue(key, out var list) ? list : new List<Order>();
+
+            var hasActive = tableOrders.Count > 0;
             var hasPending = tableOrders.Any(o => o.Status == OrderStatus.Pending);
             var totalAmount = tableOrders.Sum(o => o.TotalAmount);
-            var oldestOrder = tableOrders.OrderBy(o => o.CreatedAt).FirstOrDefault();
+            var oldestOrder = tableOrders.Count > 0
+                ? tableOrders.MinBy(o => o.CreatedAt)
+                : null;
 
             return new TableDto
             {

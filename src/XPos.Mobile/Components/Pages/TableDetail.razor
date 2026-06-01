@@ -239,7 +239,7 @@ else
             // Aktif konsolide siparişi çek
             if (table != null)
             {
-                var response = await Http.GetAsync($"api/orders/active/{table.TableNumber}");
+                var response = await Http.GetAsync($"api/orders/active/{Uri.EscapeDataString(table.TableNumber.Trim())}");
                 if (response.IsSuccessStatusCode)
                 {
                     order = await response.Content.ReadFromJsonAsync<OrderDto>();

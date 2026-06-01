@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
 
     <PropertyGroup>
@@ -73,5 +73,9 @@
     <ItemGroup>
       <ProjectReference Include="..\XPos.Shared\XPos.Shared.csproj" />
     </ItemGroup>
+
+    <Target Name="CreateMissingAndroidAssetsDir" BeforeTargets="_UpdateAndroidRes;_CompileResources">
+        <MakeDir Directories="obj\Debug\net9.0-android\assets" />
+    </Target>
 
 </Project>

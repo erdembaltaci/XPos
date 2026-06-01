@@ -3,7 +3,7 @@ import random
 from datetime import datetime, timedelta
 import os
 
-DB_PATH = r"c:\XPos\src\XPos.WebAPI\XPosDb_v3.sqlite"
+DB_PATH = "C:\\Users\\erdem\\OneDrive\\Masaüstü\\TBTK_DEMO\\src\\XPos.WebAPI\\XPosDb_v3.sqlite"
 
 # 1. Categories & Products Setup
 # 1: Başlangıç, 2: Salata, 3: Burger, 4: Pizza, 5: Ana Yemek, 6: Makarna, 7: İçecek, 8: Tatlı, 9: Kahvaltı, 10: Çorba, 11: Kebap
@@ -98,6 +98,7 @@ CUSTOMERS = [
 WEATHERS = ["Güneşli", "Bulutlu", "Yağmurlu", "Soğuk/Karlı"]
 
 def enrich():
+    print(f"Starting enrichment for DB: {DB_PATH}")
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -192,9 +193,9 @@ def enrich():
 
             created_at = current_time + timedelta(minutes=random.randint(1, 55))
             cursor.execute("""
-                INSERT INTO Orders (Id, TableNumber, CustomerName, CustomerPhone, TotalAmount, Status, CreatedAt, WeatherCondition, Temperature, PaidAmount)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (order_id, table_num, cust_name, cust_phone, total_amount, 6, created_at.strftime('%Y-%m-%d %H:%M:%S'), weather, temp, str(total_amount)))
+                INSERT INTO Orders (Id, TableNumber, TotalAmount, Status, CreatedAt, WeatherCondition, Temperature, PaidAmount)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (order_id, table_num, total_amount, 6, created_at.strftime('%Y-%m-%d %H:%M:%S'), weather, temp, str(total_amount)))
             
             for oi in order_items_to_insert:
                 cursor.execute("""

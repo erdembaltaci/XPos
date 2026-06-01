@@ -1,5 +1,6 @@
 antecedent,consequent,support,confidence,lift,leverage,conviction
-Kola / Fanta / Sprite,Patates Kızartması,0.0936,0.548,5.5399,0.0767,1.9935
-Patates Kızartması,Kola / Fanta / Sprite,0.0936,0.9461,5.5399,0.0767,15.3866
-Hızlı Kahvaltı Tabağı,Sıcak Çay,0.0577,1.0,4.2599,0.0441,inf
-Menemen,Sıcak Çay,0.0513,1.0,4.2599,0.0393,inf
+Kola / Fanta / Sprite,Patates Kızartması,0.093,0.543,5.579,0.0763,1.9753
+Patates Kızartması,Kola / Fanta / Sprite,0.093,0.955,5.579,0.0763,18.4224
+Hızlı Kahvaltı Tabağı,Sıcak Çay,0.0555,1.0,4.2218,0.0424,inf
+Menemen,Sıcak Çay,0.0506,1.0,4.2218,0.0386,inf
+Serpme Kahvaltı,Sıcak Çay,0.0533,1.0,4.2218,0.0407,inf

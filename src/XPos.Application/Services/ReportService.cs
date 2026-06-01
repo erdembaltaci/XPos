@@ -16,13 +16,9 @@ public class ReportService : IReportService
 
     public async Task<IEnumerable<DailySalesDto>> GetDailySalesAsync(DateTime startDate, DateTime endDate)
     {
-        var orders = await _orderRepository.GetAllOrdersWithItemsAsync();
+        var orders = await _orderRepository.GetPaidOrdersWithItemsByDateAsync(startDate, endDate);
         
-        var paidOrders = orders
-            .Where(o => o.Status == OrderStatus.Paid && o.CreatedAt.Date >= startDate.Date && o.CreatedAt.Date <= endDate.Date)
-            .ToList();
-
-        var dailySales = paidOrders
+        var dailySales = orders
             .GroupBy(o => o.CreatedAt.Date)
             .Select(g => new DailySalesDto
             {
@@ -36,12 +32,13 @@ public class ReportService : IReportService
         return dailySales;
     }
 
-    public async Task<IEnumerable<ProductSalesDto>> GetTopSellingProductsAsync(int count)
+    public async Task<IEnumerable<ProductSalesDto>> GetTopSellingProductsAsync(int count, DateTime? startDate = null, DateTime? endDate = null)
     {
-        var orders = await _orderRepository.GetAllOrdersWithItemsAsync();
-        var paidOrders = orders.Where(o => o.Status == OrderStatus.Paid);
-
-        var allItems = paidOrders.SelectMany(o => o.Items);
+        var start = startDate ?? DateTime.Today.AddDays(-30);
+        var end = endDate ?? DateTime.Today;
+        
+        var orders = await _orderRepository.GetPaidOrdersWithItemsByDateAsync(start, end);
+        var allItems = orders.SelectMany(o => o.Items);
 
         var productSales = allItems
             .GroupBy(i => new { i.ProductId, i.Product?.Name })
@@ -59,11 +56,13 @@ public class ReportService : IReportService
         return productSales;
     }
 
-    public async Task<IEnumerable<CategorySalesDto>> GetCategorySalesAsync()
+    public async Task<IEnumerable<CategorySalesDto>> GetCategorySalesAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
-        var orders = await _orderRepository.GetAllOrdersWithItemsAsync();
-        var paidOrders = orders.Where(o => o.Status == OrderStatus.Paid);
-        var allItems = paidOrders.SelectMany(o => o.Items);
+        var start = startDate ?? DateTime.Today.AddDays(-30);
+        var end = endDate ?? DateTime.Today;
+
+        var orders = await _orderRepository.GetPaidOrdersWithItemsByDateAsync(start, end);
+        var allItems = orders.SelectMany(o => o.Items);
 
         var totalRevenue = allItems.Sum(i => i.Quantity * i.UnitPrice);
         if (totalRevenue == 0) return new List<CategorySalesDto>();

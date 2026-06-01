@@ -29,5 +29,14 @@ public class XPosDbContext : DbContext
         modelBuilder.Entity<Order>()
             .Property(o => o.TotalAmount)
             .HasColumnType("decimal(18,2)");
+
+        // Giriş sorgularını hızlandır: Username ve Phone'da indeks
+        modelBuilder.Entity<Staff>()
+            .HasIndex(s => s.Username)
+            .HasDatabaseName("IX_Staffs_Username");
+
+        modelBuilder.Entity<Staff>()
+            .HasIndex(s => s.Phone)
+            .HasDatabaseName("IX_Staffs_Phone");
     }
 }

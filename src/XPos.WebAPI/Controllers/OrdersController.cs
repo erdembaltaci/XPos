@@ -68,7 +68,6 @@ public class OrdersController : ControllerBase
             catch (Exception hubEx)
             {
                 Console.WriteLine($"[API-ERROR] SignalR Hatası: {hubEx.Message}");
-                // SignalR hatası siparişi bozmasın, loglayıp devam edelim.
             }
             
             return CreatedAtAction(nameof(GetById), new { id = createdOrder.Id }, createdOrder);
@@ -92,6 +91,20 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] int statusId)
     {
         await _orderService.UpdateOrderStatusAsync(id, statusId);
+        
+        try
+        {
+            var updatedOrder = await _orderService.GetOrderByIdAsync(id);
+            if (updatedOrder != null)
+            {
+                await _hubContext.Clients.All.SendAsync("OrderReceived", updatedOrder);
+            }
+        }
+        catch (Exception hubEx)
+        {
+            Console.WriteLine($"[API-ERROR] SignalR Status Update Hatası: {hubEx.Message}");
+        }
+
         return NoContent();
     }
 
@@ -99,6 +112,21 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> UpdateItemStatus(int orderItemId, [FromBody] int statusId)
     {
         await _orderService.UpdateOrderItemStatusAsync(orderItemId, statusId);
+        
+        try
+        {
+            // Kalem güncellendiğinde siparişi de bildirmek için order ID'yi bulalım
+            var updatedOrder = await _orderService.GetOrderByItemIdAsync(orderItemId);
+            if (updatedOrder != null)
+            {
+                await _hubContext.Clients.All.SendAsync("OrderReceived", updatedOrder);
+            }
+        }
+        catch (Exception hubEx)
+        {
+            Console.WriteLine($"[API-ERROR] SignalR Item Status Update Hatası: {hubEx.Message}");
+        }
+
         return NoContent();
     }
 
@@ -106,6 +134,20 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> AddPayment(int id, [FromBody] PaymentRequestDto request)
     {
         await _orderService.AddPaymentAsync(id, request.Amount);
+        
+        try
+        {
+            var updatedOrder = await _orderService.GetOrderByIdAsync(id);
+            if (updatedOrder != null)
+            {
+                await _hubContext.Clients.All.SendAsync("OrderReceived", updatedOrder);
+            }
+        }
+        catch (Exception hubEx)
+        {
+            Console.WriteLine($"[API-ERROR] SignalR Payment Hatası: {hubEx.Message}");
+        }
+
         return NoContent();
     }
 
@@ -113,6 +155,20 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> PayOrderItems(int id, [FromBody] ItemPaymentRequestDto request)
     {
         await _orderService.PayOrderItemsAsync(id, request.OrderItemIds);
+        
+        try
+        {
+            var updatedOrder = await _orderService.GetOrderByIdAsync(id);
+            if (updatedOrder != null)
+            {
+                await _hubContext.Clients.All.SendAsync("OrderReceived", updatedOrder);
+            }
+        }
+        catch (Exception hubEx)
+        {
+            Console.WriteLine($"[API-ERROR] SignalR Item Payment Hatası: {hubEx.Message}");
+        }
+
         return NoContent();
     }
 }

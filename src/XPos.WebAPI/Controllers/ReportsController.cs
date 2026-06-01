@@ -25,16 +25,16 @@ public class ReportsController : ControllerBase
     }
 
     [HttpGet("products")]
-    public async Task<IActionResult> GetTopProducts([FromQuery] int count = 5)
+    public async Task<IActionResult> GetTopProducts([FromQuery] int count = 5, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
     {
-        var result = await _reportService.GetTopSellingProductsAsync(count);
+        var result = await _reportService.GetTopSellingProductsAsync(count, startDate, endDate);
         return Ok(result);
     }
 
     [HttpGet("categories")]
-    public async Task<IActionResult> GetCategorySales()
+    public async Task<IActionResult> GetCategorySales([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
     {
-        var result = await _reportService.GetCategorySalesAsync();
+        var result = await _reportService.GetCategorySalesAsync(startDate, endDate);
         return Ok(result);
     }
 }

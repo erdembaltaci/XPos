@@ -8,4 +8,6 @@ public interface IOrderRepository : IGenericRepository<Order>
     Task<IEnumerable<Order>> GetAllOrdersWithItemsAsync();
     Task<IEnumerable<Order>> GetOrdersByTableWithItemsAsync(string tableNumber);
     Task<Order?> GetOrderByItemIdAsync(int orderItemId);
+    Task<IEnumerable<Order>> GetPaidOrdersWithItemsAsync();
+    Task<IEnumerable<Order>> GetPaidOrdersWithItemsByDateAsync(System.DateTime startDate, System.DateTime endDate);
 }

@@ -14,8 +14,9 @@ public static class DbSeeder
         var context = scope.ServiceProvider.GetRequiredService<XPosDbContext>();
 
         // Force Clear (Optional - Dev only)
+        // Force Clear (Optional - Dev only)
         // context.Database.EnsureDeleted();
-        context.Database.EnsureCreated();
+        await context.Database.MigrateAsync();
 
         // Seed Products & Categories
         if (!context.Products.Any())
@@ -126,7 +127,7 @@ public static class DbSeeder
                         Capacity = i <= 8 ? 4 : 6
                     };
                     t.SecretToken = Guid.NewGuid();
-                    t.QRCodeUrl = $"http://localhost:5079/?token={t.SecretToken}";
+                    t.QRCodeUrl = $"http://localhost:5000/?token={t.SecretToken}";
                     return t;
                 }).ToList();
                 

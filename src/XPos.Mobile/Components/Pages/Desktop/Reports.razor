@@ -118,12 +118,12 @@ else
             _dailySalesLabels = dailySales.Select(d => d.Date.ToString("dd.MM")).ToArray();
 
             // 2. Categories
-            var categories = await Http.GetFromJsonAsync<List<CategorySalesDto>>($"api/reports/categories") ?? new();
+            var categories = await Http.GetFromJsonAsync<List<CategorySalesDto>>($"api/reports/categories?startDate={start:yyyy-MM-dd}&endDate={end:yyyy-MM-dd}") ?? new();
             _categoryData = categories.Select(c => (double)c.TotalRevenue).ToArray();
             _categoryLabels = categories.Select(c => $"{c.CategoryName} (%{c.Percentage:F1})").ToArray();
 
             // 3. Top Products
-            _topProducts = await Http.GetFromJsonAsync<List<ProductSalesDto>>($"api/reports/products?count=5") ?? new();
+            _topProducts = await Http.GetFromJsonAsync<List<ProductSalesDto>>($"api/reports/products?count=5&startDate={start:yyyy-MM-dd}&endDate={end:yyyy-MM-dd}") ?? new();
         }
         catch (Exception ex)
         {

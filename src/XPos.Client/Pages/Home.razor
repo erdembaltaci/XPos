@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @using XPos.Client.Services
 @using XPos.Shared.DTOs
 @using XPos.Client.Components
@@ -454,12 +454,23 @@ else
                 Console.WriteLine("Token validasyonu başarısız");
             }
         }
-        else if (string.IsNullOrEmpty(CartService.TableNumber) && !string.IsNullOrEmpty(TableNumberQuery))
+        else if (!string.IsNullOrEmpty(TableNumberQuery))
         {
             // Legacy/Dev support — avoid "Masa Masa X" duplication
             CartService.TableNumber = TableNumberQuery.StartsWith("Masa", StringComparison.OrdinalIgnoreCase)
                 ? TableNumberQuery
                 : $"Masa {TableNumberQuery}";
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "verified_table", CartService.TableNumber);
+        }
+        else
+        {
+            // No parameters in the URL -> Free entry mode. Clear the stored table.
+            CartService.TableNumber = null;
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "verified_table");
+            }
+            catch { }
         }
     }
 

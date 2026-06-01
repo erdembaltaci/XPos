@@ -118,7 +118,7 @@
 
         try
         {
-            orders = await Http.GetFromJsonAsync<List<OrderDto>>($"api/orders/table/{TableNumber}");
+            orders = await Http.GetFromJsonAsync<List<OrderDto>>($"api/orders/table/{Uri.EscapeDataString(TableNumber.Trim())}");
         }
         catch (Exception ex)
         {

@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @using Microsoft.Maui.Devices
 @using XPos.Mobile.Themes
 
@@ -291,8 +291,9 @@ else
     private double? temperature;
     
     private bool IsDesktop =>
-        DeviceInfo.Current.Platform == DevicePlatform.WinUI ||
-        DeviceInfo.Current.Platform == DevicePlatform.macOS;
+        (DeviceInfo.Current.Platform == DevicePlatform.WinUI ||
+         DeviceInfo.Current.Platform == DevicePlatform.macOS) &&
+        AuthService.Role != "Waiter";
 
     protected override void OnInitialized()
     {

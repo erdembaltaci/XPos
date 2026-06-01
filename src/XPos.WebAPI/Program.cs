@@ -10,6 +10,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
 
+System.Environment.SetEnvironmentVariable("SQLITE_TMPDIR", "D:\\TBTK_DEMO");
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -97,30 +99,31 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 var app = builder.Build();
 
 // HTTP PIPELINE
-if (app.Environment.IsDevelopment())
+// HTTP PIPELINE
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction()) // Demo için her ikisinde de aktif
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
 
-    try
+// Seed Database (Sema oluşturma ve veri yüklemesi)
+try
+{
+    using (var scope = app.Services.CreateScope())
     {
-        using (var scope = app.Services.CreateScope())
-        {
-            // Seed Database
-            await DbSeeder.Seed(scope.ServiceProvider);
-        }
+        await DbSeeder.Seed(scope.ServiceProvider);
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"DB SEEDING ERROR: {ex}");
-    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"DB SEEDING ERROR: {ex}");
 }
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 
-app.UseAuthentication(); // JWT kimlik doğrulama
-app.UseAuthorization();  // Rol bazlı yetkilendirme
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<XPos.WebAPI.Hubs.OrderHub>("/orderHub");

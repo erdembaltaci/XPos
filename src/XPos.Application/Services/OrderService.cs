@@ -95,9 +95,11 @@ public class OrderService : IOrderService
             
             // Eğer yeni bir sipariş gelirse, tüm siparişin durumunu tekrar "Pending" (Onay Bekliyor) yapıyoruz
             existingOrder.Status = OrderStatus.Pending;
-
             await _orderRepository.UpdateAsync(existingOrder);
-            return MapToDto(existingOrder);
+
+            // Re-fetch the order to ensure navigation properties (like Product) are loaded
+            var freshlyLoadedOrder = await _orderRepository.GetOrderWithItemsAsync(existingOrder.Id);
+            return MapToDto(freshlyLoadedOrder ?? existingOrder);
         }
         else
         {
@@ -135,7 +137,9 @@ public class OrderService : IOrderService
                 await _tableRepository.UpdateAsync(table);
             }
 
-            return MapToDto(order);
+            // Re-fetch the order to ensure navigation properties are loaded
+            var freshlyLoadedOrder = await _orderRepository.GetOrderWithItemsAsync(order.Id);
+            return MapToDto(freshlyLoadedOrder ?? order);
         }
     }
 
@@ -284,15 +288,29 @@ public class OrderService : IOrderService
 
     public async Task<OrderDto?> GetActiveOrderForTableAsync(string tableNumber)
     {
-        var allTableOrders = await _orderRepository.GetOrdersByTableWithItemsAsync(tableNumber);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var trimmedTableNumber = tableNumber.Trim();
+        Console.WriteLine($"[OrderService] GetActiveOrderForTableAsync - Table: '{trimmedTableNumber}'");
+
+        var allTableOrders = await _orderRepository.GetOrdersByTableWithItemsAsync(trimmedTableNumber);
+        Console.WriteLine($"[OrderService] GetOrdersByTableWithItemsAsync took: {sw.ElapsedMilliseconds} ms");
+        sw.Restart();
+
         var activeOrders = allTableOrders
             .Where(o => o.Status != OrderStatus.Paid && o.Status != OrderStatus.Cancelled)
-            .OrderBy(o => o.CreatedAt) // En eski olanı ana sipariş yapalım
+            .OrderBy(o => o.CreatedAt)
             .ToList();
+        Console.WriteLine($"[OrderService] activeOrders filter/sort took: {sw.ElapsedMilliseconds} ms");
+        sw.Restart();
 
-        if (!activeOrders.Any()) return null;
+        if (!activeOrders.Any()) 
+        {
+            Console.WriteLine($"[OrderService] No active orders found for table '{trimmedTableNumber}'");
+            return null;
+        }
 
         var primaryOrder = activeOrders.First();
+        Console.WriteLine($"[OrderService] Found {activeOrders.Count} active orders for '{trimmedTableNumber}'. Primary ID: {primaryOrder.Id}");
 
         if (activeOrders.Count > 1)
         {
@@ -334,6 +352,12 @@ public class OrderService : IOrderService
         }
 
         return MapToDto(primaryOrder);
+    }
+
+    public async Task<OrderDto?> GetOrderByItemIdAsync(int orderItemId)
+    {
+        var order = await _orderRepository.GetOrderByItemIdAsync(orderItemId);
+        return order == null ? null : MapToDto(order);
     }
 
     private static OrderDto MapToDto(Order order)

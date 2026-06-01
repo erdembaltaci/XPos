@@ -5,6 +5,8 @@
 @inject AuthStateService AuthService
 @inject NavigationManager Nav
 @inject HttpClient Http
+@inject Services.OrderStateService OrderState
+@implements IDisposable
 
 @if (!IsDesktop)
 {
@@ -181,8 +183,9 @@ else
 
 @code {
     private bool IsDesktop =>
-         DeviceInfo.Current.Platform == DevicePlatform.WinUI ||
-         DeviceInfo.Current.Platform == DevicePlatform.macOS;
+         (DeviceInfo.Current.Platform == DevicePlatform.WinUI ||
+          DeviceInfo.Current.Platform == DevicePlatform.macOS) &&
+         AuthService.Role != "Waiter";
 
     private int totalTables, occupiedTables, pendingOrders;
     private decimal dailyRevenue;
@@ -194,6 +197,25 @@ else
         if (IsDesktop)
         {
             await LoadDashboardData();
+            await OrderState.StartConnection();
+            OrderState.OnOrderReceived += HandleOrderReceived;
+        }
+    }
+
+    private void HandleOrderReceived(OrderDto order)
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadDashboardData();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        if (IsDesktop)
+        {
+            OrderState.OnOrderReceived -= HandleOrderReceived;
         }
     }
 
@@ -207,7 +229,18 @@ else
             totalTables = tables.Count;
             occupiedTables = tables.Count(t => t.IsOccupied);
             pendingOrders = orders.Count(o => o.Status == OrderStatus.Pending || o.Status == OrderStatus.AwaitingApproval);
-            dailyRevenue = orders.Where(o => o.CreatedAt.Date == DateTime.Today && o.Status == OrderStatus.Paid).Sum(o => o.TotalAmount);
+            
+            var todayStr = DateTime.Today.ToString("yyyy-MM-dd");
+            try
+            {
+                var dailySales = await Http.GetFromJsonAsync<List<DailySalesDto>>($"api/reports/daily?startDate={todayStr}&endDate={todayStr}");
+                dailyRevenue = dailySales?.Sum(d => d.TotalAmount) ?? 0;
+            }
+            catch
+            {
+                dailyRevenue = orders.Where(o => o.CreatedAt.Date == DateTime.Today && o.Status == OrderStatus.Paid).Sum(o => o.TotalAmount);
+            }
+
             recentOrders = orders.OrderByDescending(o => o.CreatedAt).Take(5).ToList();
         }
         catch { }

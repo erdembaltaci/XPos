@@ -2,8 +2,8 @@ import sqlite3
 import pandas as pd
 import os
 
-DB_PATH = r"c:\XPos\src\XPos.WebAPI\XPosDb_v3.sqlite"
-ML_DATA = r"c:\XPos\ml_data"
+DB_PATH = r"C:\\Users\\erdem\\OneDrive\\Masaüstü\\TBTK_DEMO\\src\\XPos.WebAPI\\XPosDb_v3.sqlite"
+ML_DATA = r"C:\\Users\\erdem\\OneDrive\\Masaüstü\\TBTK_DEMO\\ml_data"
 
 def sync():
     if not os.path.exists(ML_DATA): os.makedirs(ML_DATA)
@@ -34,8 +34,6 @@ def sync():
         SELECT 
             o.Id as siparis_id,
             o.TotalAmount as toplam_tutar,
-            o.CustomerName as musteri_adi,
-            o.CustomerPhone as musteri_tel,
             STRFTIME('%H', o.CreatedAt) as saat,
             STRFTIME('%w', o.CreatedAt) as gun_no,
             o.WeatherCondition as hava_durumu,
