@@ -17,7 +17,7 @@ graph TD
         C[Mutfak Ekranı - MAUI Hybrid]
     end
 
-    subgraph "Backend Katmanı (.NET 9)"
+    subgraph "Backend Katmanı (.NET 8)"
         D[WebAPI - ASP.NET Core]
         E[SignalR Hub - Realtime]
         F[(SQLite DB)]
